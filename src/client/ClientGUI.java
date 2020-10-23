@@ -26,7 +26,7 @@ public class ClientGUI extends JFrame implements ActionListener{
     private Container container = this.getContentPane();
 
 
-    protected JFrame frame = new JFrame();
+    protected JFrame frame;
     protected JPanel clientPanel, userPanel;
     protected JTextArea textArea;
     private JTextField nameInput;
@@ -40,7 +40,29 @@ public class ClientGUI extends JFrame implements ActionListener{
         this.setBounds(400,200,550,400);
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-//        Container container = this.getContentPane();
+        Container container = this.getContentPane();
+
+        frame = new JFrame();
+
+        //TODO понять почему не срабатывает
+        frame.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent windowEvent) {
+
+                System.out.println("aaaaaaaa");
+                if(chatClient != null){
+                    try {
+                        chatClient.chatServer.disconnect(chatClient);
+                        System.out.println("ddddddd");
+                    } catch (RemoteException e) {
+                        e.printStackTrace();
+                    }
+                }
+                System.exit(0);
+            }
+        });
+
+
 
         container.setLayout(new BorderLayout());
         container.add(getStartPanel(), BorderLayout.CENTER);
@@ -293,9 +315,9 @@ public class ClientGUI extends JFrame implements ActionListener{
 
 
     public static void main(String[] args) throws Exception {
+
         ClientGUI app = new ClientGUI();
         app.setVisible(true);
-
 
     }
 }

@@ -1,6 +1,7 @@
 package server;
 
 import client.ChatClient;
+import client.ChatClientImpl;
 import entity.Message;
 import entity.User;
 
@@ -81,9 +82,19 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer{
     }
 
     @Override
-    public void disconnect(User user) {
-        activeUsers.remove(user);
-        System.out.println(user.getName() + " удален");
+    public void disconnect(ChatClientImpl chatClient) {
+        activeUsers.removeIf(user -> user.getName().equals(chatClient.getUsername())
+                && user.getClientServiceName().equals(chatClient.getClientServiceName())
+                && user.getGender().equals(chatClient.getGender())
+                && user.getHostName().equals(chatClient.getHostName()));
+
+
+        if(!activeUsers.isEmpty()){
+            updateUserList();
+        }
+
+
+        System.out.println(activeUsers);
     }
 
     @Override

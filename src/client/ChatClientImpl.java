@@ -28,7 +28,7 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
 
     private String serviceName = "server";
     private String clientServiceName;
-    private ChatServer chatServer;
+    protected ChatServer chatServer;
 
     public ChatClientImpl(ClientGUI clientGUI, String username, String gender, char[] password) throws RemoteException {
         super();
@@ -75,8 +75,6 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
 
     public void registerWithServer(HashMap<String, String> details, char[] password) {
         try{
-//            this.getRef();
-//            System.out.println(this.getRef());
             chatServer.connect(details, password);
         }
         catch(Exception e){
@@ -87,5 +85,62 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
     @Override
     public void updateUserList(List<String> activeUsers) {
 
+    }
+
+
+    public String getHostName() {
+        return hostName;
+    }
+
+    public void setHostName(String hostName) {
+        this.hostName = hostName;
+    }
+
+    public ClientGUI getClientGUI() {
+        return clientGUI;
+    }
+
+    public void setClientGUI(ClientGUI clientGUI) {
+        this.clientGUI = clientGUI;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getGender() {
+        return gender;
+    }
+
+    public void setGender(String gender) {
+        this.gender = gender;
+    }
+
+    public char[] getPassword() {
+        return password;
+    }
+
+    public void setPassword(char[] password) {
+        this.password = password;
+    }
+
+    public String getServiceName() {
+        return serviceName;
+    }
+
+    public void setServiceName(String serviceName) {
+        this.serviceName = serviceName;
+    }
+
+    public String getClientServiceName() {
+        return clientServiceName;
+    }
+
+    public void setClientServiceName(String clientServiceName) {
+        this.clientServiceName = clientServiceName;
     }
 }

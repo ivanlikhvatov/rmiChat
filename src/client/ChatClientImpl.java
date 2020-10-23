@@ -12,6 +12,8 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
+import java.util.HashMap;
+import java.util.List;
 
 public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
 
@@ -21,87 +23,69 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
     private ClientGUI clientGUI;
     private String username;
     private String gender;
-    private String password;
+    private char[] password;
 
 
-    private String serviceName = "GroupChatService";
+    private String serviceName = "server";
     private String clientServiceName;
     private ChatServer chatServer;
 
-    public ChatClientImpl(ClientGUI clientGUI, String username) throws RemoteException {
+    public ChatClientImpl(ClientGUI clientGUI, String username, String gender, char[] password) throws RemoteException {
         super();
         this.clientGUI = clientGUI;
         this.username = username;
+        this.gender = gender;
+        this.password = password;
     }
 
 
-//    @Override
     public void identificationUser() throws RemoteException{
-        String[] details = {username, hostName, clientServiceName};
+//        String[] details = {username, hostName, clientServiceName};
+        clientServiceName = "Client_" + username;
+
+        HashMap<String, String> details = new HashMap<>();
+        details.put("username", username);
+        details.put("gender", gender);
+        details.put("clientServiceName", clientServiceName);
+        details.put("hostName", hostName);
 
 
 
         try {
-            final Registry registry = LocateRegistry.getRegistry("localhost", 2099);
-//            Naming.rebind("rmi://" + hostName + "/" + clientServiceName, this);
-            chatServer = (ChatServer) registry.lookup(UNIC_BINDING_NAME);
+//            final Registry registry = LocateRegistry.getRegistry("localhost", 2099);
+//            chatServer = (ChatServer) registry.lookup(UNIC_BINDING_NAME);
+
+            Naming.rebind("rmi://" + hostName + "/" + clientServiceName, this);
+            chatServer = (ChatServer) Naming.lookup(UNIC_BINDING_NAME);
+
         }
         catch (ConnectException  e) {
             JOptionPane.showMessageDialog(
                     clientGUI.frame, "The server seems to be unavailable\nPlease try later",
                     "Connection problem", JOptionPane.ERROR_MESSAGE);
-//            connectionProblem = true;
             e.printStackTrace();
         }
-        catch(NotBoundException me){
-//            connectionProblem = true;
+        catch(NotBoundException | MalformedURLException me){
             me.printStackTrace();
         }
-//        if(!connectionProblem){
-            registerWithServer(details);
-//        }
+
+        registerWithServer(details, password);
         System.out.println("Client Listen RMI Server is running...\n");
     }
 
-    public void registerWithServer(String[] details) {
+    public void registerWithServer(HashMap<String, String> details, char[] password) {
         try{
-            chatServer.connect(new User(this.username, "123", "male"));
+//            this.getRef();
+//            System.out.println(this.getRef());
+            chatServer.connect(details, password);
         }
         catch(Exception e){
             e.printStackTrace();
         }
     }
 
-//    @Override
-//    public void disconnectServer() {
-//
-//    }
-//
-//    @Override
-//    public void sendPersonalMessage(String message) {
-//
-//    }
-//
-//    @Override
-//    public void sendGeneralMessage(String message) {
-//
-//    }
+    @Override
+    public void updateUserList(List<String> activeUsers) {
 
-
-
-
-
-//    public static void main(String[] args) throws Exception
-//    {
-//        //создание реестра расшареных объетов
-//        final Registry registry = LocateRegistry.getRegistry("localhost", 2099);
-//
-//        //получаем объект (на самом деле это proxy-объект)
-//        ChatServer service = (ChatServer) registry.lookup(UNIC_BINDING_NAME);
-//
-//        //Вызываем удаленный метод
-//        service.connect(new User("gena", "123", "male"));
-//
-//        service.getGeneralMessage();
-//    }
+    }
 }

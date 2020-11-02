@@ -1,6 +1,7 @@
 package entity;
 
-import client.ChatClient;
+
+import interfaces.ChatClient;
 
 import java.io.Serializable;
 import java.util.Arrays;

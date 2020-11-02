@@ -1,7 +1,9 @@
 package client;
 
-import entity.User;
-import server.ChatServer;
+
+
+import interfaces.ChatClient;
+import interfaces.ChatServer;
 
 import javax.swing.*;
 import java.net.MalformedURLException;
@@ -9,11 +11,10 @@ import java.rmi.ConnectException;
 import java.rmi.Naming;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
-import java.rmi.registry.LocateRegistry;
-import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
 
@@ -40,10 +41,9 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
 
 
     public void identificationUser() throws RemoteException{
-//        String[] details = {username, hostName, clientServiceName};
         clientServiceName = "Client_" + username;
 
-        HashMap<String, String> details = new HashMap<>();
+        Map<String, String> details = new HashMap<>();
         details.put("username", username);
         details.put("gender", gender);
         details.put("clientServiceName", clientServiceName);
@@ -73,7 +73,7 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         System.out.println("Client Listen RMI Server is running...\n");
     }
 
-    public void registerWithServer(HashMap<String, String> details, char[] password) {
+    public void registerWithServer(Map<String, String> details, char[] password) {
         try{
             chatServer.connect(details, password);
         }

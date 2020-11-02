@@ -1,6 +1,5 @@
-package client;
+package interfaces;
 
-import entity.User;
 
 import java.rmi.Remote;
 import java.rmi.RemoteException;

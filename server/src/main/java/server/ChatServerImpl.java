@@ -1,19 +1,16 @@
 package server;
 
-import client.ChatClient;
-import client.ChatClientImpl;
 import entity.Message;
 import entity.User;
+import interfaces.ChatClient;
+import interfaces.ChatServer;
 
 import java.net.MalformedURLException;
 import java.rmi.*;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
-public class ChatServerImpl extends UnicastRemoteObject implements ChatServer{
+public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
 
     public static final String UNIC_BINDING_NAME = "server";
 
@@ -28,7 +25,7 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer{
     }
 
     @Override
-    public void connect(HashMap<String, String> details, char[] password) {
+    public void connect(Map<String, String> details, char[] password) {
         try{
             ChatClient nextClient = (ChatClient)Naming.lookup("rmi://" + details.get("hostName") + "/" + details.get("clientServiceName"));
 
@@ -39,10 +36,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer{
                     details.get("hostName"),
                     details.get("clientServiceName"),
                     nextClient));
-
-//            nextClient.messageFromServer("[Server] : Hello " + details[0] + " you are now free to chat.\n");
-//
-//            sendToAll("[Server] : " + details[0] + " has joined the group.\n");
 
             updateUserList();
         }
@@ -82,11 +75,11 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer{
     }
 
     @Override
-    public void disconnect(ChatClientImpl chatClient) {
-        activeUsers.removeIf(user -> user.getName().equals(chatClient.getUsername())
-                && user.getClientServiceName().equals(chatClient.getClientServiceName())
-                && user.getGender().equals(chatClient.getGender())
-                && user.getHostName().equals(chatClient.getHostName()));
+    public void disconnect(ChatClient chatClient) {
+//        activeUsers.removeIf(user -> user.getName().equals(chatClient.getUsername())
+//                && user.getClientServiceName().equals(chatClient.getClientServiceName())
+//                && user.getGender().equals(chatClient.getGender())
+//                && user.getHostName().equals(chatClient.getHostName()));
 
 
         if(!activeUsers.isEmpty()){
@@ -110,8 +103,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer{
 
 
     public static void main (String[] args) throws RemoteException, AlreadyBoundException, InterruptedException, MalformedURLException {
-
-
 //        final ChatServer service = new ChatServerImpl();
 //
 //        //создание реестра расшареных объетов

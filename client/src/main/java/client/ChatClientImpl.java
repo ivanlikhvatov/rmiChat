@@ -12,9 +12,8 @@ import java.rmi.Naming;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.security.SecureRandom;
+import java.util.*;
 
 public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
 
@@ -25,11 +24,14 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
     private String username;
     private String gender;
     private char[] password;
+    private String login;
 
 
     private String serviceName = "server";
     private String clientServiceName;
     protected ChatServer chatServer;
+
+    private static final String charactersForLogin = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefhhijklmnopqrstuvwxyz";
 
     public ChatClientImpl(ClientGUI clientGUI, String username, String gender, char[] password) throws RemoteException {
         super();
@@ -37,23 +39,23 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         this.username = username;
         this.gender = gender;
         this.password = password;
+        this.login = generateRandomLogin();
     }
 
 
     public void identificationUser() throws RemoteException{
-        clientServiceName = "Client_" + username;
+        clientServiceName = "Client_" + username + "_" + login;
 
         Map<String, String> details = new HashMap<>();
         details.put("username", username);
         details.put("gender", gender);
         details.put("clientServiceName", clientServiceName);
         details.put("hostName", hostName);
+        details.put("login", login);
 
 
 
         try {
-//            final Registry registry = LocateRegistry.getRegistry("localhost", 2099);
-//            chatServer = (ChatServer) registry.lookup(UNIC_BINDING_NAME);
 
             Naming.rebind("rmi://" + hostName + "/" + clientServiceName, this);
             chatServer = (ChatServer) Naming.lookup(UNIC_BINDING_NAME);
@@ -85,6 +87,17 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
     @Override
     public void updateUserList(List<String> activeUsers) {
 
+    }
+
+    public String generateRandomLogin() {
+        Random random = new SecureRandom();
+
+        StringBuilder sb = new StringBuilder(10);
+        for (int i = 0; i < 10; i++) {
+            sb.append(charactersForLogin.charAt(random.nextInt(charactersForLogin.length())));
+        }
+
+        return sb.toString();
     }
 
 
@@ -135,6 +148,7 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
     public void setServiceName(String serviceName) {
         this.serviceName = serviceName;
     }
+
 
     public String getClientServiceName() {
         return clientServiceName;

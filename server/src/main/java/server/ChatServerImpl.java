@@ -8,11 +8,14 @@ import interfaces.ChatServer;
 import java.net.MalformedURLException;
 import java.rmi.*;
 import java.rmi.server.UnicastRemoteObject;
+import java.security.SecureRandom;
 import java.util.*;
 
 public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
 
     public static final String UNIC_BINDING_NAME = "server";
+
+    private static final String charactersForLogin = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefhhijklmnopqrstuvwxyz";
 
     private List<User> activeUsers;
     private List<Message> messages;
@@ -35,6 +38,7 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                     details.get("gender"),
                     details.get("hostName"),
                     details.get("clientServiceName"),
+                    details.get("login"),
                     nextClient));
 
             updateUserList();
@@ -75,11 +79,18 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
     }
 
     @Override
-    public void disconnect(ChatClient chatClient) {
-//        activeUsers.removeIf(user -> user.getName().equals(chatClient.getUsername())
-//                && user.getClientServiceName().equals(chatClient.getClientServiceName())
-//                && user.getGender().equals(chatClient.getGender())
-//                && user.getHostName().equals(chatClient.getHostName()));
+    public void disconnect(ChatClient chatClient) throws RemoteException {
+
+        Iterator<User> iter = activeUsers.iterator();
+
+        while (iter.hasNext()) {
+            User user = iter.next();
+
+            if (user.getClientServiceName().equals(chatClient.getClientServiceName()))
+                iter.remove();
+        }
+
+
 
 
         if(!activeUsers.isEmpty()){
@@ -130,4 +141,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
         Naming.rebind("rmi://" + hostName + "/" + serviceName, hello);
 
     }
+
+
 }

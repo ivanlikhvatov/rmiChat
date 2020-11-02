@@ -14,16 +14,18 @@ public class User implements Serializable {
     private String hostName;
     private String clientServiceName;
     private ChatClient client;
+    private String login;
 
     public User() {
     }
 
-    public User(String name, char[] password, String gender, String hostName, String clientServiceName, ChatClient client) {
+    public User(String name, char[] password, String gender, String hostName, String clientServiceName, String login,ChatClient client) {
         this.name = name;
         this.password = password;
         this.gender = gender;
         this.hostName = hostName;
         this.clientServiceName = clientServiceName;
+        this.login = login;
         this.client = client;
     }
 
@@ -75,7 +77,16 @@ public class User implements Serializable {
         this.client = client;
     }
 
+    public String getLogin() {
+        return login;
+    }
 
+    public void setLogin(String login) {
+        this.login = login;
+    }
+
+
+    //TODO переписать equals, если он вообще будет нужен
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

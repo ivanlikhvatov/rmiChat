@@ -5,6 +5,7 @@ import javax.swing.border.Border;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.WindowEvent;
 import java.rmi.RemoteException;
 import java.util.Arrays;
 
@@ -42,14 +43,10 @@ public class ClientGUI extends JFrame implements ActionListener{
 
         Container container = this.getContentPane();
 
-        frame = new JFrame();
-
-        //TODO понять почему не срабатывает
-        frame.addWindowListener(new java.awt.event.WindowAdapter() {
+        this.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
-            public void windowClosing(java.awt.event.WindowEvent windowEvent) {
+            public void windowClosing(WindowEvent windowEvent) {
 
-                System.out.println("aaaaaaaa");
                 if(chatClient != null){
                     try {
                         chatClient.chatServer.disconnect(chatClient);

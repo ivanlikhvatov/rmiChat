@@ -85,7 +85,17 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
     }
 
     @Override
-    public void updateUserList(List<String> activeUsers) {
+    public void updateUserList(Map<String, String> activeUsers) {
+
+        if (clientGUI.generalMessagePanel != null){
+            clientGUI.generalMessagePanel.remove(clientGUI.activeUsersScrollPanel);
+        }
+
+
+        clientGUI.setActiveUsersPanel(activeUsers);
+        clientGUI.activeUsersScrollPanel.repaint();
+        clientGUI.activeUsersScrollPanel.revalidate();
+
 
     }
 
@@ -156,5 +166,37 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
 
     public void setClientServiceName(String clientServiceName) {
         this.clientServiceName = clientServiceName;
+    }
+
+
+    static class UserLoginAndName {
+        private String login;
+        private String username;
+
+        public UserLoginAndName(String login, String username) {
+            this.login = login;
+            this.username = username;
+        }
+
+        public String getLogin() {
+            return login;
+        }
+
+        public void setLogin(String login) {
+            this.login = login;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+
+        @Override
+        public String toString() {
+            return username;
+        }
     }
 }

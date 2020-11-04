@@ -55,7 +55,7 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
     }
 
     private void updateUserList() {
-        List<String> namesOfActiveUsers = getUserList();
+        Map<String, String> namesOfActiveUsers = getUserList();
 
         for(User user : this.activeUsers){
             try {
@@ -68,11 +68,11 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
     }
 
 
-    private List<String> getUserList(){
-        List<String> namesOfActiveUsers = new ArrayList<>();
+    private Map<String, String> getUserList(){
+        Map<String, String> namesOfActiveUsers = new HashMap<>();
 
         for (User user: activeUsers) {
-            namesOfActiveUsers.add(user.getName());
+            namesOfActiveUsers.put(user.getLogin(), user.getName());
         }
 
         return namesOfActiveUsers;

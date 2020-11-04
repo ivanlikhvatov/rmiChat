@@ -1,13 +1,16 @@
 package client;
 
 import javax.swing.*;
-import javax.swing.border.Border;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowEvent;
 import java.rmi.RemoteException;
-import java.util.Arrays;
+
+import static client.ChatClientImpl.*;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class ClientGUI extends JFrame implements ActionListener{
 
@@ -17,23 +20,20 @@ public class ClientGUI extends JFrame implements ActionListener{
     private String gender;
     private String message;
 
+    private JList<UserLoginAndName> activeUsers;
 
-    private JPanel textPanel, inputPanel;
-    private JTextField textField;
-
-    private Font meiryoFont = new Font("Meiryo", Font.PLAIN, 14);
-    private Border blankBorder = BorderFactory.createEmptyBorder(10,10,20,10);//top,r,b,l
 
     private Container container = this.getContentPane();
 
 
     protected JFrame frame;
-    protected JPanel clientPanel, userPanel;
-    protected JTextArea textArea;
     private JTextField nameInput;
     private JPasswordField passInput;
     private JRadioButton radioMale, radioFemale;
     protected JButton loginButton, registrationButton, endRegistrationButton, sendGMButton, sendPMessageButton, getStartPanelButton;
+    protected JPanel activeUsersScrollPanel, generalMessagePanel, privateMessagePanel, PMDialogPanel;
+    protected JTextArea textArea;
+    private JTextField textField;
 
     public ClientGUI(){
         super("Простой чат");
@@ -100,11 +100,20 @@ public class ClientGUI extends JFrame implements ActionListener{
                 gender = radioFemale.getText();
             }
 
-            System.out.println(name + " " + Arrays.toString(pass) + " " + gender);
+
+
+//            System.out.println(name + " " + Arrays.toString(pass) + " " + gender);
 
             try{
                 chatClient = new ChatClientImpl(this, name, gender, pass);
+
+                container.removeAll();
+                container.setLayout(new BorderLayout());
+                container.add(getGeneralMessagePanel(), BorderLayout.CENTER);
+                container.revalidate();
+
                 chatClient.identificationUser();
+
             } catch (RemoteException remoteException){
                 remoteException.printStackTrace();
             }
@@ -207,109 +216,104 @@ public class ClientGUI extends JFrame implements ActionListener{
 
 
 
+//    public JPanel getActiveUsersScrollPanel(){
+//
+//
+//        return activeUsersScrollPanel;
+//    }
 
-
-
-
-
-
-
-
-
-
-
-
-
-//    public JPanel getInputPanel(){
-//        inputPanel = new JPanel(new GridLayout(1, 1, 5, 5));
+    public JPanel getInputPanel(){
+        JPanel inputPanel = new JPanel(new GridLayout(1, 1, 5, 5));
 //        inputPanel.setBorder(blankBorder);
-//        textField = new JTextField();
+        textField = new JTextField();
 //        textField.setFont(meiryoFont);
-//        inputPanel.add(textField);
-//        return inputPanel;
-//    }
-//
-//    public JPanel getTextPanel(){
-//        String welcome = "Welcome enter your name, password,\ngender and press Start to begin\n";
-//        textArea = new JTextArea(welcome, 14, 27);
-//        textArea.setMargin(new Insets(10, 10, 10, 10));
+        inputPanel.add(textField);
+        return inputPanel;
+    }
+
+    public JPanel getGeneralMessagePanel(){
+
+        generalMessagePanel = new JPanel(new BorderLayout());
+
+
+
+        generalMessagePanel.add(getInputPanel(), BorderLayout.SOUTH);
+        generalMessagePanel.add(getTextPanel(), BorderLayout.CENTER);
+
+
+        Map<String, String> temp = new HashMap<>();
+        temp.put("nothing", "noChatters");
+        setActiveUsersPanel(temp);
+
+//        generalMessagePanel.add(makeButtonPanel(), BorderLayout.SOUTH);
+//        generalMessagePanel.setBorder(blankBorder);
+
+        return generalMessagePanel;
+    }
+
+    public JPanel getPrivateMessagePanel(){
+
+        return privateMessagePanel;
+    }
+
+    public JPanel getPMDialogPanel(){
+
+        return PMDialogPanel;
+    }
+
+    public void setActiveUsersPanel(Map<String, String> users){
+
+        DefaultListModel<UserLoginAndName> tempUsersList = new DefaultListModel<>();
+        activeUsersScrollPanel = new JPanel(new BorderLayout());
+
+        for (Map.Entry<String, String> entry : users.entrySet()) {
+            tempUsersList.addElement(new UserLoginAndName(entry.getKey(), entry.getValue()));
+        }
+
+        activeUsers = new JList<>(tempUsersList);
+        activeUsers.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+        activeUsers.setVisibleRowCount(8);
+        JScrollPane listScrollPane = new JScrollPane(activeUsers);
+
+        String  userStr = "Пользователи";
+
+        JLabel userLabel = new JLabel(userStr, JLabel.CENTER);
+        activeUsersScrollPanel.add(userLabel, BorderLayout.NORTH);
+        userLabel.setFont(new Font("Meiryo", Font.PLAIN, 16));
+
+        activeUsersScrollPanel.add(listScrollPane, BorderLayout.CENTER);
+
+        if (generalMessagePanel != null){
+            generalMessagePanel.add(activeUsersScrollPanel, BorderLayout.WEST);
+        }
+
+        if (privateMessagePanel != null){
+            privateMessagePanel.add(activeUsersScrollPanel, BorderLayout.WEST);
+        }
+
+        if (PMDialogPanel != null){
+            PMDialogPanel.add(activeUsersScrollPanel, BorderLayout.WEST);
+        }
+
+    }
+
+
+    public JPanel getTextPanel(){
+        String welcome = "Приветствуем вас в нашем чате!";
+        textArea = new JTextArea(welcome, 14, 34);
+        textArea.setMargin(new Insets(10, 10, 10, 10));
 //        textArea.setFont(meiryoFont);
-//
-//        textArea.setLineWrap(true);
-//        textArea.setWrapStyleWord(true);
-//        textArea.setEditable(false);
-//        JScrollPane scrollPane = new JScrollPane(textArea);
-//        textPanel = new JPanel();
-//        textPanel.add(scrollPane);
-//
-//        textPanel.setFont(new Font("Meiryo", Font.PLAIN, 14));
-//        return textPanel;
-//    }
 
+        textArea.setLineWrap(true);
+        textArea.setWrapStyleWord(true);
+        textArea.setEditable(false);
+        JScrollPane scrollPane = new JScrollPane(textArea);
+        JPanel textPanel = new JPanel();
+        textPanel.add(scrollPane);
 
-//    public JPanel makeButtonPanel() {
-//        sendGMButton = new JButton("Send ");
-//        sendGMButton.addActionListener(this);
-//        sendGMButton.setEnabled(false);
-//
-//        sendPMessageButton = new JButton("Send PM");
-//        sendPMessageButton.addActionListener(this);
-//        sendPMessageButton.setEnabled(false);
-//
-//        loginButton = new JButton("Start ");
-//        loginButton.addActionListener(this);
-//
-//        JPanel buttonPanel = new JPanel(new GridLayout(4, 1));
-//        buttonPanel.add(sendPMessageButton);
-//        buttonPanel.add(new JLabel(""));
-//        buttonPanel.add(loginButton);
-//        buttonPanel.add(sendGMButton);
-//
-//        return buttonPanel;
-//    }
-
-//    public JPanel getUsersPanel(){
-//
-//        userPanel = new JPanel(new BorderLayout());
-//        String  userStr = " Current Users      ";
-//
-//        JLabel userLabel = new JLabel(userStr, JLabel.CENTER);
-//        userPanel.add(userLabel, BorderLayout.NORTH);
-//        userLabel.setFont(new Font("Meiryo", Font.PLAIN, 16));
-//
-//        String[] noClientsYet = {"No other users"};
-//        setClientPanel(noClientsYet);
-//
-//        clientPanel.setFont(meiryoFont);
-//        userPanel.add(makeButtonPanel(), BorderLayout.SOUTH);
-//        userPanel.setBorder(blankBorder);
-//
-//        return userPanel;
-//    }
-
-
-//    public void setClientPanel(String[] currClients) {
-//        clientPanel = new JPanel(new BorderLayout());
-////        listModel = new DefaultListModel<String>();
-////
-////        for(String s : currClients){
-////            listModel.addElement(s);
-////        }
-////        if(currClients.length > 1){
-////            privateMsgButton.setEnabled(true);
-////        }
-////
-////        //Create the list and put it in a scroll pane.
-////        list = new JList<String>(listModel);
-////        list.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
-////        list.setVisibleRowCount(8);
-////        list.setFont(meiryoFont);
-////        JScrollPane listScrollPane = new JScrollPane(list);
-//
-////        clientPanel.add(listScrollPane, BorderLayout.CENTER);
-//        userPanel.add(clientPanel, BorderLayout.CENTER);
-//    }
-
+        textPanel.setFont(new Font("Meiryo", Font.PLAIN, 14));
+        return textPanel;
+    }
 
     public static void main(String[] args) throws Exception {
 

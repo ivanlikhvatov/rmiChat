@@ -12,5 +12,7 @@ public interface ChatClient extends Remote {
 //    void identificationUser() throws RemoteException;
 //    void disconnectServer();
 //    void sendPersonalMessage(String message);
-//    void sendGeneralMessage(String message);
+    void sendGeneralMessage(String message, String login) throws RemoteException;
+
+    void messageFromServer(String message) throws RemoteException;
 }

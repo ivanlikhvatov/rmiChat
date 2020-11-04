@@ -40,6 +40,7 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         this.gender = gender;
         this.password = password;
         this.login = generateRandomLogin();
+        clientGUI.login = this.login;
     }
 
 
@@ -91,12 +92,23 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
             clientGUI.generalMessagePanel.remove(clientGUI.activeUsersScrollPanel);
         }
 
-
         clientGUI.setActiveUsersPanel(activeUsers);
         clientGUI.activeUsersScrollPanel.repaint();
         clientGUI.activeUsersScrollPanel.revalidate();
+    }
 
+    @Override
+    public void sendGeneralMessage(String message, String login) throws RemoteException {
+        chatServer.getGeneralMessage(message, login);
+    }
 
+    @Override
+    public void messageFromServer(String message) throws RemoteException {
+        System.out.println( message );
+        clientGUI.textArea.append( message );
+        clientGUI.textArea.setCaretPosition(clientGUI.textArea.getDocument().getLength());
+
+        clientGUI.messageInput.setText("");
     }
 
     public String generateRandomLogin() {
@@ -159,7 +171,7 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         this.serviceName = serviceName;
     }
 
-
+    @Override
     public String getClientServiceName() {
         return clientServiceName;
     }
@@ -167,7 +179,6 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
     public void setClientServiceName(String clientServiceName) {
         this.clientServiceName = clientServiceName;
     }
-
 
     static class UserLoginAndName {
         private String login;

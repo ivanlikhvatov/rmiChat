@@ -1,6 +1,7 @@
 package client;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -18,6 +19,9 @@ public class ClientGUI extends JFrame implements ActionListener{
     private String name;
     private char[] pass;
     private String gender;
+
+    protected String login; //TODO подумать стоит ли тут размещать логин
+
     private String message;
 
     private JList<UserLoginAndName> activeUsers;
@@ -26,14 +30,18 @@ public class ClientGUI extends JFrame implements ActionListener{
     private Container container = this.getContentPane();
 
 
+
     protected JFrame frame;
-    private JTextField nameInput;
+
+    private JPanel inputPanel;
+    protected JTextField nameInput, messageInput;
     private JPasswordField passInput;
     private JRadioButton radioMale, radioFemale;
-    protected JButton loginButton, registrationButton, endRegistrationButton, sendGMButton, sendPMessageButton, getStartPanelButton;
+    protected JButton loginButton, logoutButton, registrationButton, endRegistrationButton,
+            sendGMButton, sendPMessageButton,
+            getStartPanelButton, getGMPanelButton, getPMPanelButton, getPMDialogPanelButton;
     protected JPanel activeUsersScrollPanel, generalMessagePanel, privateMessagePanel, PMDialogPanel;
     protected JTextArea textArea;
-    private JTextField textField;
 
     public ClientGUI(){
         super("Простой чат");
@@ -50,7 +58,6 @@ public class ClientGUI extends JFrame implements ActionListener{
                 if(chatClient != null){
                     try {
                         chatClient.chatServer.disconnect(chatClient);
-                        System.out.println("ddddddd");
                     } catch (RemoteException e) {
                         e.printStackTrace();
                     }
@@ -65,7 +72,6 @@ public class ClientGUI extends JFrame implements ActionListener{
         container.add(getStartPanel(), BorderLayout.CENTER);
 
     }
-
 
     @Override
     public void actionPerformed(ActionEvent e) {
@@ -86,6 +92,8 @@ public class ClientGUI extends JFrame implements ActionListener{
 
         if (e.getSource() == endRegistrationButton){
 
+
+            //TODO выкидыает ошибку и регистрирует с null-ом того поля которое не заполнено
             if (nameInput.getText().isEmpty() || passInput.getPassword().length == 0 || (!radioFemale.isSelected() && !radioMale.isSelected())){
                 JOptionPane.showMessageDialog(null, "Заполните все поля!",
                         "Не все поля заполнены", JOptionPane.ERROR_MESSAGE);
@@ -100,10 +108,6 @@ public class ClientGUI extends JFrame implements ActionListener{
                 gender = radioFemale.getText();
             }
 
-
-
-//            System.out.println(name + " " + Arrays.toString(pass) + " " + gender);
-
             try{
                 chatClient = new ChatClientImpl(this, name, gender, pass);
 
@@ -112,12 +116,44 @@ public class ClientGUI extends JFrame implements ActionListener{
                 container.add(getGeneralMessagePanel(), BorderLayout.CENTER);
                 container.revalidate();
 
+
                 chatClient.identificationUser();
+
+                this.setBounds(300,200,750,400);
 
             } catch (RemoteException remoteException){
                 remoteException.printStackTrace();
             }
 
+
+        }
+
+
+        if (e.getSource() == logoutButton){
+
+            if(chatClient != null){
+                try {
+                    chatClient.chatServer.disconnect(chatClient);
+
+                    container.removeAll();
+                    container.setLayout(new BorderLayout());
+                    container.add(getStartPanel(), BorderLayout.CENTER);
+                    container.revalidate();
+                    this.setBounds(400,200,550,400);
+
+                } catch (RemoteException remoteException) {
+                    remoteException.printStackTrace();
+                }
+            }
+        }
+
+        if (e.getSource() == sendGMButton){
+
+            try{
+                chatClient.sendGeneralMessage(messageInput.getText(), login);
+            } catch (RemoteException remoteException){
+                remoteException.printStackTrace();
+            }
 
         }
 
@@ -213,39 +249,58 @@ public class ClientGUI extends JFrame implements ActionListener{
         return startPanel;
     }
 
-
-
-
-//    public JPanel getActiveUsersScrollPanel(){
-//
-//
-//        return activeUsersScrollPanel;
-//    }
-
-    public JPanel getInputPanel(){
-        JPanel inputPanel = new JPanel(new GridLayout(1, 1, 5, 5));
-//        inputPanel.setBorder(blankBorder);
-        textField = new JTextField();
-//        textField.setFont(meiryoFont);
-        inputPanel.add(textField);
-        return inputPanel;
-    }
-
     public JPanel getGeneralMessagePanel(){
 
         generalMessagePanel = new JPanel(new BorderLayout());
 
+        getGMPanelButton = new JButton("общие сообщения");
+        getGMPanelButton.addActionListener(this);
 
+        getPMPanelButton = new JButton("личные сообщения");
+        getPMPanelButton.addActionListener(this);
+
+        sendGMButton = new JButton("отправить");
+        sendGMButton.setMargin(new Insets(5, 10, 5, 10));
+        sendGMButton.addActionListener(this);
+
+        logoutButton = new JButton("выйти");
+        logoutButton.addActionListener(this);
+
+
+        JPanel chooseTypeMessagePanel = new JPanel(new GridLayout(1, 2, 28, 0));
+        chooseTypeMessagePanel.add(getGMPanelButton);
+        chooseTypeMessagePanel.add(getPMPanelButton);
+
+        JPanel flowLeft = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        flowLeft.add(chooseTypeMessagePanel);
+        flowLeft.setBorder(new EmptyBorder(5, 0, -5, 0));
+
+
+
+        JPanel logoutPanel = new JPanel(new GridLayout(1, 2, 5, 0));
+        logoutPanel.add(logoutButton);
+
+        JPanel flowRight = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        flowRight.add(logoutPanel);
+        flowRight.setBorder(new EmptyBorder(5, 0, -5, 0));
+
+
+        JPanel flowLeftAndRight = new JPanel(new GridLayout(1, 2, 5, 0));
+
+        flowLeftAndRight.add(flowLeft);
+        flowLeftAndRight.add(flowRight);
+
+        generalMessagePanel.add(flowLeftAndRight, BorderLayout.NORTH);
+//        generalMessagePanel.add(flowRight, BorderLayout.NORTH);
 
         generalMessagePanel.add(getInputPanel(), BorderLayout.SOUTH);
+        inputPanel.add(sendGMButton, BorderLayout.WEST);
         generalMessagePanel.add(getTextPanel(), BorderLayout.CENTER);
-
 
         Map<String, String> temp = new HashMap<>();
         temp.put("nothing", "noChatters");
         setActiveUsersPanel(temp);
 
-//        generalMessagePanel.add(makeButtonPanel(), BorderLayout.SOUTH);
 //        generalMessagePanel.setBorder(blankBorder);
 
         return generalMessagePanel;
@@ -275,13 +330,21 @@ public class ClientGUI extends JFrame implements ActionListener{
         activeUsers.setVisibleRowCount(8);
         JScrollPane listScrollPane = new JScrollPane(activeUsers);
 
-        String  userStr = "Пользователи";
+        String  userStr = "Пользователи онлайн";
+        sendPMessageButton = new JButton("написать");
+
+        sendPMessageButton.setMargin(new Insets(5, 0, 5, 0));
 
         JLabel userLabel = new JLabel(userStr, JLabel.CENTER);
+        userLabel.setBorder(new EmptyBorder(0, 3, 6, 3));
+
         activeUsersScrollPanel.add(userLabel, BorderLayout.NORTH);
+        activeUsersScrollPanel.add(sendPMessageButton, BorderLayout.SOUTH);
+
         userLabel.setFont(new Font("Meiryo", Font.PLAIN, 16));
 
         activeUsersScrollPanel.add(listScrollPane, BorderLayout.CENTER);
+        activeUsersScrollPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 30, 0));
 
         if (generalMessagePanel != null){
             generalMessagePanel.add(activeUsersScrollPanel, BorderLayout.WEST);
@@ -297,10 +360,9 @@ public class ClientGUI extends JFrame implements ActionListener{
 
     }
 
-
     public JPanel getTextPanel(){
-        String welcome = "Приветствуем вас в нашем чате!";
-        textArea = new JTextArea(welcome, 14, 34);
+        String welcome = "Приветствуем вас в нашем чате!\n";
+        textArea = new JTextArea(welcome, 16, 42);
         textArea.setMargin(new Insets(10, 10, 10, 10));
 //        textArea.setFont(meiryoFont);
 
@@ -314,6 +376,19 @@ public class ClientGUI extends JFrame implements ActionListener{
         textPanel.setFont(new Font("Meiryo", Font.PLAIN, 14));
         return textPanel;
     }
+
+    public JPanel getInputPanel(){
+        inputPanel = new JPanel(new BorderLayout());
+//        inputPanel.setBorder(blankBorder);
+        messageInput = new JTextField();
+//        textField.setFont(meiryoFont);
+        inputPanel.add(messageInput, BorderLayout.CENTER);
+
+        inputPanel.setBorder(new EmptyBorder(10, 8, 10, 8));
+        return inputPanel;
+    }
+
+
 
     public static void main(String[] args) throws Exception {
 

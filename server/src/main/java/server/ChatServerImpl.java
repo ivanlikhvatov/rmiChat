@@ -102,29 +102,48 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
     }
 
     @Override
-    public void getPersonalMessage() {
+    public void getPersonalMessage(String message) {
 
     }
 
     @Override
-    public void getGeneralMessage() {
+    public void getGeneralMessage(String message, String login) {
+        User user = findByLogin(login);
 
+        if (user == null){
+            return;
+        }
+
+        //TODO проверить на цензуру сообщения, если не проходит бан или предупреждение
+
+        String messageFromServer =  "[" +user.getName() + "]" + " : " + message + "\n";
+        sendToAll(messageFromServer);
+    }
+
+    private void sendToAll(String message) {
+        for(User user : activeUsers){
+            try {
+                user.getClient().messageFromServer(message);
+            }
+            catch (RemoteException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private User findByLogin(String login){
+        for (User user : activeUsers){
+            if (user.getLogin().equals(login)){
+                return user;
+            }
+        }
+
+        return null;
     }
 
 
 
     public static void main (String[] args) throws RemoteException, AlreadyBoundException, InterruptedException, MalformedURLException {
-//        final ChatServer service = new ChatServerImpl();
-//
-//        //создание реестра расшареных объетов
-//        final Registry registry = LocateRegistry.createRegistry(2099);
-//        //создание "заглушки" – приемника удаленных вызовов
-//        Remote stub = UnicastRemoteObject.exportObject(service, 0);
-//        //регистрация "заглушки" в реесте
-//        registry.bind(UNIC_BINDING_NAME, stub);
-//
-////усыпляем главный поток, иначе программа завершится
-//        Thread.sleep(Integer.MAX_VALUE);
 
         java.rmi.registry.LocateRegistry.createRegistry(1099);
 

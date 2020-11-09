@@ -1,6 +1,8 @@
 package server;
 
+import entity.GeneralMessage;
 import entity.Message;
+import entity.PrivateMessage;
 import entity.User;
 import interfaces.ChatClient;
 import interfaces.ChatServer;
@@ -8,23 +10,30 @@ import interfaces.ChatServer;
 import java.net.MalformedURLException;
 import java.rmi.*;
 import java.rmi.server.UnicastRemoteObject;
-import java.security.SecureRandom;
 import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
 
     public static final String UNIC_BINDING_NAME = "server";
+    public static final String HOST_NAME = "localhost";
+    private static final int MAX_COUNT_THREADS = 1000;
 
-    private static final String charactersForLogin = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefhhijklmnopqrstuvwxyz";
+    private static final String CHARACTER_FOR_LOGIN = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefhhijklmnopqrstuvwxyz";
 
     private List<User> activeUsers;
-    private List<Message> messages;
+    private List<Message> allMessages;
+    private Queue<Message> messagesToSend;
+    private List<Thread> senders;
 
     public ChatServerImpl() throws RemoteException
     {
         super();
         activeUsers = new ArrayList<>();
-        messages = new ArrayList<>();
+        allMessages = new ArrayList<>();
+        messagesToSend = new ConcurrentLinkedQueue<>();
+        senders = new ArrayList<>();
+
     }
 
     @Override
@@ -114,21 +123,36 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
             return;
         }
 
-        //TODO проверить на цензуру сообщения, если не проходит бан или предупреждение
 
+
+        //TODO проверить на цензуру сообщения, если не проходит бан или предупреждение
         String messageFromServer =  "[" +user.getName() + "]" + " : " + message + "\n";
-        sendToAll(messageFromServer);
+//        sendToAll(messageFromServer);
+
+        GeneralMessage gm = new GeneralMessage();
+        gm.setText(messageFromServer);
+        gm.setAuthor(user);
+
+        allMessages.add(gm);
+        messagesToSend.add(gm);
+
+        createSender();
+
+
+
     }
 
-    private void sendToAll(String message) {
-        for(User user : activeUsers){
-            try {
-                user.getClient().messageFromServer(message);
-            }
-            catch (RemoteException e) {
-                e.printStackTrace();
-            }
+    private void createSender(){
+
+        int currentCountThreads = Thread.getAllStackTraces().keySet().size();
+
+        if (currentCountThreads >= MAX_COUNT_THREADS){
+            return;
         }
+
+        Thread sender = new Thread(new Sender());
+        sender.start();
+        senders.add(sender);
     }
 
     private User findByLogin(String login){
@@ -141,14 +165,62 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
         return null;
     }
 
+    class Sender implements Runnable{
+
+        @Override
+        public void run() {
+            Message message;
+
+            while (messagesToSend.size() > 0) {
 
 
-    public static void main (String[] args) throws RemoteException, AlreadyBoundException, InterruptedException, MalformedURLException {
+                if ((message = messagesToSend.poll()) != null){
+
+                    if (message.getClass().equals(PrivateMessage.class)){
+                        PrivateMessage pm = (PrivateMessage) message;
+                        System.out.println(pm.getClass());
+                    }
+
+
+                    if (message.getClass().equals(GeneralMessage.class)){
+                        GeneralMessage gm = (GeneralMessage) message;
+                        sendToAll(gm.getText());
+
+                    }
+
+                }
+
+            }
+
+
+            if (!senders.isEmpty()){
+                senders.remove(this);
+            }
+
+
+
+        }
+
+        public void sendToAll(String message){
+            for(User user : activeUsers){
+                try {
+                    user.getClient().messageFromServer(message);
+                }
+                catch (RemoteException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+    }
+
+
+    public static void main (String[] args) throws RemoteException, MalformedURLException {
 
         java.rmi.registry.LocateRegistry.createRegistry(1099);
 
-        String hostName = "localhost";
-        String serviceName = "server";
+        String hostName = HOST_NAME;
+        String serviceName = UNIC_BINDING_NAME;
 
         if(args.length == 2){
             hostName = args[0];
@@ -160,6 +232,7 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
         Naming.rebind("rmi://" + hostName + "/" + serviceName, hello);
 
     }
+
 
 
 }

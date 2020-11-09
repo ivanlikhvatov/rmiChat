@@ -10,7 +10,7 @@ import java.rmi.RemoteException;
 
 import static client.ChatClientImpl.*;
 
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class ClientGUI extends JFrame implements ActionListener{
@@ -19,20 +19,12 @@ public class ClientGUI extends JFrame implements ActionListener{
     private String name;
     private char[] pass;
     private String gender;
-
     protected String login; //TODO подумать стоит ли тут размещать логин
 
-    private String message;
-
-    private JList<UserLoginAndName> activeUsers;
-
-
-    private Container container = this.getContentPane();
-
-
-
     protected JFrame frame;
-
+    private Container container = this.getContentPane();
+    private JList<PrivateMessage> privateMessages;
+    private JList<UserLoginAndName> activeUsers;
     private JPanel inputPanel;
     protected JTextField nameInput, messageInput;
     private JPasswordField passInput;
@@ -40,7 +32,7 @@ public class ClientGUI extends JFrame implements ActionListener{
     protected JButton loginButton, logoutButton, registrationButton, endRegistrationButton,
             sendGMButton, sendPMessageButton,
             getStartPanelButton, getGMPanelButton, getPMPanelButton, getPMDialogPanelButton;
-    protected JPanel activeUsersScrollPanel, generalMessagePanel, privateMessagePanel, PMDialogPanel;
+    protected JPanel activeUsersScrollPanel, pmDialogsScrollPanel, generalMessagePanel, privateMessagePanel, PMDialogPanel;
     protected JTextArea textArea;
 
     public ClientGUI(){
@@ -111,13 +103,13 @@ public class ClientGUI extends JFrame implements ActionListener{
             try{
                 chatClient = new ChatClientImpl(this, name, gender, pass);
 
+                chatClient.identificationUser();
+
                 container.removeAll();
                 container.setLayout(new BorderLayout());
                 container.add(getGeneralMessagePanel(), BorderLayout.CENTER);
                 container.revalidate();
 
-
-                chatClient.identificationUser();
 
                 this.setBounds(300,200,750,400);
 
@@ -155,6 +147,20 @@ public class ClientGUI extends JFrame implements ActionListener{
                 remoteException.printStackTrace();
             }
 
+        }
+
+        if (e.getSource() == getGMPanelButton){
+            container.removeAll();
+            container.setLayout(new BorderLayout());
+            container.add(getGeneralMessagePanel(), BorderLayout.CENTER);
+            container.revalidate();
+        }
+
+        if (e.getSource() == getPMPanelButton){
+            container.removeAll();
+            container.setLayout(new BorderLayout());
+            container.add(getPrivateMessagePanel(), BorderLayout.CENTER);
+            container.revalidate();
         }
 
     }
@@ -297,9 +303,8 @@ public class ClientGUI extends JFrame implements ActionListener{
         inputPanel.add(sendGMButton, BorderLayout.WEST);
         generalMessagePanel.add(getTextPanel(), BorderLayout.CENTER);
 
-        Map<String, String> temp = new HashMap<>();
-        temp.put("nothing", "noChatters");
-        setActiveUsersPanel(temp);
+
+        generalMessagePanel.add(activeUsersScrollPanel, BorderLayout.WEST);
 
 //        generalMessagePanel.setBorder(blankBorder);
 
@@ -308,12 +313,59 @@ public class ClientGUI extends JFrame implements ActionListener{
 
     public JPanel getPrivateMessagePanel(){
 
+        privateMessagePanel = new JPanel(new BorderLayout());
+
+        getGMPanelButton = new JButton("общие сообщения");
+        getGMPanelButton.addActionListener(this);
+
+        getPMPanelButton = new JButton("личные сообщения");
+        getPMPanelButton.addActionListener(this);
+
+        logoutButton = new JButton("выйти");
+        logoutButton.addActionListener(this);
+
+
+        JPanel chooseTypeMessagePanel = new JPanel(new GridLayout(1, 2, 28, 0));
+        chooseTypeMessagePanel.add(getGMPanelButton);
+        chooseTypeMessagePanel.add(getPMPanelButton);
+
+        JPanel flowLeft = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        flowLeft.add(chooseTypeMessagePanel);
+        flowLeft.setBorder(new EmptyBorder(5, 0, -5, 0));
+
+
+
+        JPanel logoutPanel = new JPanel(new GridLayout(1, 2, 5, 0));
+        logoutPanel.add(logoutButton);
+
+        JPanel flowRight = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        flowRight.add(logoutPanel);
+        flowRight.setBorder(new EmptyBorder(5, 0, -5, 0));
+
+
+        JPanel flowLeftAndRight = new JPanel(new GridLayout(1, 2, 5, 0));
+
+        flowLeftAndRight.add(flowLeft);
+        flowLeftAndRight.add(flowRight);
+
+
+
+        privateMessagePanel.add(flowLeftAndRight, BorderLayout.NORTH);
+        privateMessagePanel.add(activeUsersScrollPanel, BorderLayout.WEST);
+
         return privateMessagePanel;
     }
 
     public JPanel getPMDialogPanel(){
 
         return PMDialogPanel;
+    }
+
+    public void setPMDialogsPanel(Map<String, String> usersAndOurMessage){
+        DefaultListModel<PrivateMessage> tempDialogUserPanel = new DefaultListModel<>();
+
+        pmDialogsScrollPanel = new JPanel(new BorderLayout());
+
     }
 
     public void setActiveUsersPanel(Map<String, String> users){
@@ -354,10 +406,6 @@ public class ClientGUI extends JFrame implements ActionListener{
             privateMessagePanel.add(activeUsersScrollPanel, BorderLayout.WEST);
         }
 
-        if (PMDialogPanel != null){
-            PMDialogPanel.add(activeUsersScrollPanel, BorderLayout.WEST);
-        }
-
     }
 
     public JPanel getTextPanel(){
@@ -390,7 +438,7 @@ public class ClientGUI extends JFrame implements ActionListener{
 
 
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args){
 
         ClientGUI app = new ClientGUI();
         app.setVisible(true);

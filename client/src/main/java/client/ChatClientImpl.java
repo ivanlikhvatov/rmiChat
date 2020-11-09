@@ -31,7 +31,7 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
     private String clientServiceName;
     protected ChatServer chatServer;
 
-    private static final String charactersForLogin = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefhhijklmnopqrstuvwxyz";
+    private static final String CHARACTER_FOR_LOGIN = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefhhijklmnopqrstuvwxyz";
 
     public ChatClientImpl(ClientGUI clientGUI, String username, String gender, char[] password) throws RemoteException {
         super();
@@ -116,7 +116,7 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
 
         StringBuilder sb = new StringBuilder(10);
         for (int i = 0; i < 10; i++) {
-            sb.append(charactersForLogin.charAt(random.nextInt(charactersForLogin.length())));
+            sb.append(CHARACTER_FOR_LOGIN.charAt(random.nextInt(CHARACTER_FOR_LOGIN.length())));
         }
 
         return sb.toString();
@@ -208,6 +208,42 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         @Override
         public String toString() {
             return username;
+        }
+    }
+
+    static class PrivateMessage{
+        private String username;
+        private String interlocutorLogin;
+        private String text;
+
+        public PrivateMessage(String interlocutorLogin, String text, String username) {
+            this.interlocutorLogin = interlocutorLogin;
+            this.text = text;
+            this.username = username;
+        }
+
+        public String getInterlocutorLogin() {
+            return interlocutorLogin;
+        }
+
+        public void setInterlocutorLogin(String interlocutorLogin) {
+            this.interlocutorLogin = interlocutorLogin;
+        }
+
+        public String getText() {
+            return text;
+        }
+
+        public void setText(String text) {
+            this.text = text;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
         }
     }
 }

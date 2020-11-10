@@ -4,14 +4,13 @@ import java.io.Serializable;
 
 public class GeneralMessage extends Message implements Serializable{
     private User author;
-    private String text;
 
     public GeneralMessage() {
     }
 
     public GeneralMessage(User author, String text) {
+        super(text);
         this.author = author;
-        this.text = text;
     }
 
     public User getAuthor() {
@@ -23,10 +22,11 @@ public class GeneralMessage extends Message implements Serializable{
     }
 
     public String getText() {
-        return text;
+        return super.getMessage();
     }
 
     public void setText(String text) {
-        this.text = text;
+        super.setMessage(text);
     }
+
 }

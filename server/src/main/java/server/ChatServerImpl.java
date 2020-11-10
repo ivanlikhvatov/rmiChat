@@ -51,6 +51,7 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                     nextClient));
 
             updateUserList();
+            setAllMessages(nextClient);
         }
 
 
@@ -58,12 +59,35 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
             e.printStackTrace();
         }
 
-        System.out.println(activeUsers);
-
 
     }
 
-    private void updateUserList() {
+    private void setAllMessages(ChatClient newClient) {
+
+        try {
+            newClient.setGeneralMessages(getGeneralMessageTextList());
+            //TODO добавлять старые сообщения приватные если пользователь входит и не регистрируется
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    private List<String> getGeneralMessageTextList(){
+        List<String> messageTextList = new ArrayList<>();
+
+        for (Message message : allMessages) {
+            if (message.getClass().equals(GeneralMessage.class)){
+                messageTextList.add(message.getMessage());
+            }
+
+
+        }
+
+        return messageTextList;
+    }
+
+    private void updateUserList() throws RemoteException{
         Map<String, String> namesOfActiveUsers = getUserList();
 
         for(User user : this.activeUsers){
@@ -107,16 +131,13 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
         }
 
 
-        System.out.println(activeUsers);
     }
 
-    @Override
-    public void getPersonalMessage(String message) {
 
-    }
+
 
     @Override
-    public void getGeneralMessage(String message, String login) {
+    public void setGeneralMessage(String message, String login) {
         User user = findByLogin(login);
 
         if (user == null){
@@ -127,7 +148,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
 
         //TODO проверить на цензуру сообщения, если не проходит бан или предупреждение
         String messageFromServer =  "[" +user.getName() + "]" + " : " + message + "\n";
-//        sendToAll(messageFromServer);
 
         GeneralMessage gm = new GeneralMessage();
         gm.setText(messageFromServer);
@@ -138,6 +158,68 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
 
         createSender();
 
+
+
+    }
+
+
+    @Override
+    public void setPrivateMessage(String addresseeLogin, String senderLogin, String message){
+        User addressee = findByLogin(addresseeLogin);
+
+        if (addressee == null){
+            return;
+        }
+
+        User sender = findByLogin(senderLogin);
+
+        if (sender == null){
+            return;
+        }
+
+        //TODO проверить на цензуру сообщения, если не проходит бан или предупреждение
+        String messageFromServer =  "[" +sender.getName() + "]" + " : " + message + "\n";
+
+        PrivateMessage pm = new PrivateMessage();
+        pm.setAddressee(addressee);
+        pm.setAuthor(sender);
+        pm.setMessage(messageFromServer);
+
+        allMessages.add(pm);
+        messagesToSend.add(pm);
+
+        createSender();
+    }
+
+    @Override
+    public void setPrivateMessage(List<String> addresseesLoginList, String senderLogin, String message){
+
+
+        User sender = findByLogin(senderLogin);
+
+        if (sender == null){
+            return;
+        }
+
+        //TODO проверить на цензуру сообщения, если не проходит бан или предупреждение
+        String messageFromServer =  "[" +sender.getName() + "]" + " : " + message + "\n";
+
+        for (String addresseeLogin : addresseesLoginList) {
+            User addressee = findByLogin(addresseeLogin);
+
+            if (addressee == null){
+                return;
+            }
+
+            PrivateMessage pm = new PrivateMessage();
+            pm.setAuthor(sender);
+            pm.setAddressee(addressee);
+            pm.setMessage(messageFromServer);
+
+            allMessages.add(pm);
+            messagesToSend.add(pm);
+            createSender();
+        }
 
 
     }
@@ -173,12 +255,28 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
 
             while (messagesToSend.size() > 0) {
 
-
                 if ((message = messagesToSend.poll()) != null){
 
                     if (message.getClass().equals(PrivateMessage.class)){
                         PrivateMessage pm = (PrivateMessage) message;
-                        System.out.println(pm.getClass());
+
+                        ChatClient addresseeClient = pm.getAddressee().getClient();
+                        ChatClient authorClient = pm.getAuthor().getClient();
+
+                        Map<String, String> messageDetails = new HashMap<>();
+                        messageDetails.put("authorName", pm.getAuthor().getName());
+                        messageDetails.put("authorLogin", pm.getAuthor().getLogin());
+                        messageDetails.put("addresseeName", pm.getAddressee().getName());
+                        messageDetails.put("addresseeLogin", pm.getAddressee().getLogin());
+                        messageDetails.put("message", pm.getMessage());
+
+                        try{
+                            authorClient.privateMessageFromServer(messageDetails, findPrivateMessageByUserLogin(pm.getAuthor().getLogin()));
+                            addresseeClient.privateMessageFromServer(messageDetails, findPrivateMessageByUserLogin(pm.getAddressee().getLogin()));
+                        } catch (RemoteException e) {
+                            e.printStackTrace();
+                        }
+
                     }
 
 
@@ -201,10 +299,121 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
 
         }
 
-        public void sendToAll(String message){
+        private List<String[]> findPrivateMessageByUserLogin(String userLogin){
+
+            List<String[]> userPrivateMessages = new ArrayList<>();
+            List<String> passedUsers = new ArrayList<>();
+
+            for (int i = allMessages.size() - 1; i > 0; i--) {
+                if (allMessages.get(i).getClass().equals(PrivateMessage.class)){
+
+                    PrivateMessage pm = (PrivateMessage) allMessages.get(i);
+
+                    if (pm.getAddressee().getLogin().equals(userLogin)){
+
+                        if (passedUsers.contains(pm.getAuthor().getLogin())){
+                            continue;
+                        }
+
+                        String login = pm.getAuthor().getLogin();
+                        String username = pm.getAuthor().getName();
+                        String textMessage = pm.getMessage();
+
+                        String[] details = new String[3];
+                        details[0] = login;
+                        details[1] = username;
+                        details[2] = textMessage;
+
+
+                        passedUsers.add(login);
+                        userPrivateMessages.add(details);
+
+
+                    }
+
+                    if (pm.getAuthor().getLogin().equals(userLogin)){
+
+                        if (passedUsers.contains(pm.getAddressee().getLogin())){
+                            continue;
+                        }
+
+                        String login = pm.getAddressee().getLogin();
+                        String username = pm.getAddressee().getName();
+                        String textMessage = pm.getMessage();
+
+                        String[] details = new String[3];
+                        details[0] = login;
+                        details[1] = username;
+                        details[2] = textMessage;
+
+                        passedUsers.add(login);
+                        userPrivateMessages.add(details);
+                    }
+
+
+
+                }
+            }
+
+            return userPrivateMessages;
+        }
+
+
+
+
+
+
+//        private List<String[]> findAllPrivateMessageByUserLogin(String userLogin){
+//
+//            List<String[]> userPrivateMessages = new ArrayList<>();
+//
+//            for (Message message: allMessages) {
+//                if (message.getClass().equals(PrivateMessage.class)){
+//
+//                    PrivateMessage pm = (PrivateMessage) message;
+//
+//                    if (pm.getAddressee().getLogin().equals(userLogin)){
+//                        String login = pm.getAuthor().getLogin();
+//                        String username = pm.getAuthor().getName();
+//                        String textMessage = pm.getMessage();
+//
+//                        String[] details = new String[3];
+//                        details[0] = login;
+//                        details[1] = username;
+//                        details[2] = textMessage;
+//
+//                        userPrivateMessages.add(details);
+//                    }
+//
+//                    if (pm.getAuthor().getLogin().equals(userLogin)){
+//                        String login = pm.getAddressee().getLogin();
+//                        String username = pm.getAddressee().getName();
+//                        String textMessage = pm.getMessage();
+//
+//                        String[] details = new String[3];
+//                        details[0] = login;
+//                        details[1] = username;
+//                        details[2] = textMessage;
+//
+//                        userPrivateMessages.add(details);
+//                    }
+//
+//
+//
+//                }
+//            }
+//
+//            return userPrivateMessages;
+//        }
+
+
+
+
+
+        private void sendToAll(String message){
             for(User user : activeUsers){
                 try {
-                    user.getClient().messageFromServer(message);
+                    user.getClient().generalMessageFromServer(message);
                 }
                 catch (RemoteException e) {
                     e.printStackTrace();

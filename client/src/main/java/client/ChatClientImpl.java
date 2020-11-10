@@ -72,6 +72,10 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
             me.printStackTrace();
         }
 
+        clientGUI.generalMessages = new ArrayList<>();
+        clientGUI.privateMessages = new ArrayList<>();
+        clientGUI.privateDialogs = new JList<>();
+
         registerWithServer(details, password);
         System.out.println("Client Listen RMI Server is running...\n");
     }
@@ -83,6 +87,11 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         catch(Exception e){
             e.printStackTrace();
         }
+    }
+
+    @Override
+    public void setGeneralMessages(List<String> messages){
+        clientGUI.generalMessages.addAll(messages);
     }
 
     @Override
@@ -99,16 +108,78 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
 
     @Override
     public void sendGeneralMessage(String message, String login) throws RemoteException {
-        chatServer.getGeneralMessage(message, login);
+        chatServer.setGeneralMessage(message, login);
     }
 
     @Override
-    public void messageFromServer(String message) throws RemoteException {
+    public void generalMessageFromServer(String message){
         System.out.println( message );
-        clientGUI.textArea.append( message );
-        clientGUI.textArea.setCaretPosition(clientGUI.textArea.getDocument().getLength());
 
-        clientGUI.messageInput.setText("");
+        clientGUI.generalMessages.add(message);
+
+        if (clientGUI.generalTextArea != null) {
+            clientGUI.generalTextArea.append(message);
+            clientGUI.generalTextArea.setCaretPosition(clientGUI.generalTextArea.getDocument().getLength());
+        }
+
+        if (clientGUI.messageInput != null){
+            clientGUI.messageInput.setText("");
+        }
+
+    }
+
+    @Override
+    public void privateMessageFromServer(Map<String, String> messageDetails, List<String[]> interlocutorsAndLastMessage) {
+        PrivateMessage pm = new PrivateMessage();
+
+        pm.setAddressee(new UserLoginAndName(messageDetails.get("addresseeLogin"), messageDetails.get("addresseeName")));
+        pm.setSender(new UserLoginAndName(messageDetails.get("authorLogin"), messageDetails.get("authorName")));
+        pm.setText(messageDetails.get("message"));
+
+
+
+
+
+
+        if (clientGUI.privateMessagePanel != null){
+            clientGUI.privateMessagePanel.remove(clientGUI.pmDialogsScrollPanel);
+        }
+
+        clientGUI.setPrivateDialogsPanel(interlocutorsAndLastMessage);
+
+        clientGUI.pmDialogsScrollPanel.repaint();
+        clientGUI.pmDialogsScrollPanel.revalidate();
+
+
+        clientGUI.privateMessages.add(pm);
+
+        if (messageDetails.get("authorLogin").equals(this.login)){
+            if (clientGUI.messageInput != null){
+                clientGUI.messageInput.setText("");
+            }
+        }
+
+        if (clientGUI.privateTextArea != null){
+            clientGUI.privateTextArea.append(messageDetails.get("message"));
+            clientGUI.privateTextArea.setCaretPosition(clientGUI.privateTextArea.getDocument().getLength());
+        }
+
+
+    }
+
+    @Override
+    public String getClientServiceName() {
+        return clientServiceName;
+    }
+
+    @Override
+    public void sendPrivateMessage(String addressee, String message) throws RemoteException {
+        chatServer.setPrivateMessage(addressee, login, message);
+    }
+
+    @Override
+    public void sendPrivateMessage(List<String> addressees, String message) throws RemoteException {
+        chatServer.setPrivateMessage(addressees, login, message);
     }
 
     public String generateRandomLogin() {
@@ -171,10 +242,9 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         this.serviceName = serviceName;
     }
 
-    @Override
-    public String getClientServiceName() {
-        return clientServiceName;
-    }
+
+
+
 
     public void setClientServiceName(String clientServiceName) {
         this.clientServiceName = clientServiceName;
@@ -212,22 +282,33 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
     }
 
     static class PrivateMessage{
-        private String username;
-        private String interlocutorLogin;
+        private UserLoginAndName sender;
+        private UserLoginAndName addressee;
         private String text;
 
-        public PrivateMessage(String interlocutorLogin, String text, String username) {
-            this.interlocutorLogin = interlocutorLogin;
+        public PrivateMessage() {
+        }
+
+        public PrivateMessage(UserLoginAndName sender, UserLoginAndName addressee, String text) {
+            this.sender = sender;
+            this.addressee = addressee;
             this.text = text;
-            this.username = username;
         }
 
-        public String getInterlocutorLogin() {
-            return interlocutorLogin;
+        public UserLoginAndName getSender() {
+            return sender;
         }
 
-        public void setInterlocutorLogin(String interlocutorLogin) {
-            this.interlocutorLogin = interlocutorLogin;
+        public void setSender(UserLoginAndName sender) {
+            this.sender = sender;
+        }
+
+        public UserLoginAndName getAddressee() {
+            return addressee;
+        }
+
+        public void setAddressee(UserLoginAndName addressee) {
+            this.addressee = addressee;
         }
 
         public String getText() {
@@ -237,13 +318,39 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         public void setText(String text) {
             this.text = text;
         }
+    }
 
-        public String getUsername() {
-            return username;
+    static class DialogLastMessage{
+        private UserLoginAndName interlocutor;
+        private String lastMessage;
+
+        public DialogLastMessage() {
         }
 
-        public void setUsername(String username) {
-            this.username = username;
+        public DialogLastMessage(UserLoginAndName interlocutor, String lastMessage) {
+            this.interlocutor = interlocutor;
+            this.lastMessage = lastMessage;
+        }
+
+        public UserLoginAndName getInterlocutor() {
+            return interlocutor;
+        }
+
+        public void setInterlocutor(UserLoginAndName interlocutor) {
+            this.interlocutor = interlocutor;
+        }
+
+        public String getLastMessage() {
+            return lastMessage;
+        }
+
+        public void setLastMessage(String lastMessage) {
+            this.lastMessage = lastMessage;
+        }
+
+        @Override
+        public String toString() {
+            return interlocutor.getUsername() + "\n" + lastMessage;
         }
     }
 }

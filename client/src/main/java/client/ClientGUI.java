@@ -2,6 +2,8 @@ package client;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -10,6 +12,8 @@ import java.rmi.RemoteException;
 
 import static client.ChatClientImpl.*;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -20,20 +24,23 @@ public class ClientGUI extends JFrame implements ActionListener{
     private char[] pass;
     private String gender;
     protected String login; //TODO подумать стоит ли тут размещать логин
+    private UserLoginAndName addressee;
 
     protected JFrame frame;
     private Container container = this.getContentPane();
-    private JList<PrivateMessage> privateMessages;
+    protected List<PrivateMessage> privateMessages;
+    protected List<String> generalMessages;
     private JList<UserLoginAndName> activeUsers;
+    protected JList<DialogLastMessage> privateDialogs;
     private JPanel inputPanel;
     protected JTextField nameInput, messageInput;
     private JPasswordField passInput;
     private JRadioButton radioMale, radioFemale;
     protected JButton loginButton, logoutButton, registrationButton, endRegistrationButton,
             sendGMButton, sendPMessageButton,
-            getStartPanelButton, getGMPanelButton, getPMPanelButton, getPMDialogPanelButton;
+            getStartPanelButton, getGMPanelButton, getPMPanelButton, getPMDialogPanelButton, openPrivateChat;
     protected JPanel activeUsersScrollPanel, pmDialogsScrollPanel, generalMessagePanel, privateMessagePanel, PMDialogPanel;
-    protected JTextArea textArea;
+    protected JTextArea generalTextArea, privateTextArea;
 
     public ClientGUI(){
         super("Простой чат");
@@ -161,6 +168,59 @@ public class ClientGUI extends JFrame implements ActionListener{
             container.setLayout(new BorderLayout());
             container.add(getPrivateMessagePanel(), BorderLayout.CENTER);
             container.revalidate();
+        }
+
+
+        if(e.getSource() == openPrivateChat){
+            if (activeUsers.getSelectedIndices().length > 1){
+                List<String> loginList = new ArrayList<>();
+
+                for (UserLoginAndName user : activeUsers.getSelectedValuesList()){
+                    loginList.add(user.getLogin());
+                }
+
+                try{
+                    chatClient.sendPrivateMessage(loginList, messageInput.getText());
+                } catch (RemoteException remoteException){
+                    remoteException.printStackTrace();
+                }
+
+            } else {
+                addressee = activeUsers.getSelectedValue();
+
+                container.removeAll();
+                container.setLayout(new BorderLayout());
+                container.add(getPrivateDialogPanel(), BorderLayout.CENTER);
+                container.revalidate();
+            }
+
+
+        }
+
+        if (e.getSource() == sendPMessageButton){
+            if (activeUsers.getSelectedIndices().length > 1){
+                List<String> loginList = new ArrayList<>();
+
+                for (UserLoginAndName user : activeUsers.getSelectedValuesList()){
+                    loginList.add(user.getLogin());
+                }
+
+                try{
+                    chatClient.sendPrivateMessage(loginList, messageInput.getText());
+                } catch (RemoteException remoteException){
+                    remoteException.printStackTrace();
+                }
+
+
+            } else {
+                UserLoginAndName addressee = activeUsers.getSelectedValue();
+
+                try{
+                    chatClient.sendPrivateMessage(addressee.getLogin(), messageInput.getText());
+                } catch (RemoteException remoteException){
+                    remoteException.printStackTrace();
+                }
+            }
         }
 
     }
@@ -301,7 +361,7 @@ public class ClientGUI extends JFrame implements ActionListener{
 
         generalMessagePanel.add(getInputPanel(), BorderLayout.SOUTH);
         inputPanel.add(sendGMButton, BorderLayout.WEST);
-        generalMessagePanel.add(getTextPanel(), BorderLayout.CENTER);
+        generalMessagePanel.add(getGeneralTextPanel(), BorderLayout.CENTER);
 
 
         generalMessagePanel.add(activeUsersScrollPanel, BorderLayout.WEST);
@@ -348,30 +408,76 @@ public class ClientGUI extends JFrame implements ActionListener{
         flowLeftAndRight.add(flowLeft);
         flowLeftAndRight.add(flowRight);
 
+        if (privateDialogs.getModel().getSize() == 0){
+            List<String[]> emptyDialogs = new ArrayList<>();
+            emptyDialogs.add(new String[]{"nothing", "У вас нет сообщений", ""});
+            setPrivateDialogsPanel(emptyDialogs);
+        }
+
 
 
         privateMessagePanel.add(flowLeftAndRight, BorderLayout.NORTH);
         privateMessagePanel.add(activeUsersScrollPanel, BorderLayout.WEST);
+        privateMessagePanel.add(pmDialogsScrollPanel, BorderLayout.CENTER);
 
         return privateMessagePanel;
     }
 
-    public JPanel getPMDialogPanel(){
+    public JPanel getPrivateDialogPanel(){
+        PMDialogPanel = new JPanel(new BorderLayout());
 
         return PMDialogPanel;
     }
 
-    public void setPMDialogsPanel(Map<String, String> usersAndOurMessage){
-        DefaultListModel<PrivateMessage> tempDialogUserPanel = new DefaultListModel<>();
+    public void setPrivateDialogsPanel(List<String[]> interlocutorsAndLastMessage){
 
         pmDialogsScrollPanel = new JPanel(new BorderLayout());
+
+        DefaultListModel<DialogLastMessage> tempPrivateMessages = new DefaultListModel<>();
+
+        for (String[] messageDetails : interlocutorsAndLastMessage){
+            String login = messageDetails[0];
+            String username = messageDetails[1];
+            String message = messageDetails[2];
+
+            UserLoginAndName user = new UserLoginAndName(login, username);
+
+            tempPrivateMessages.addElement(new DialogLastMessage(user, message));
+        }
+
+        privateDialogs = new JList<>(tempPrivateMessages);
+        privateDialogs.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+        privateDialogs.setVisibleRowCount(2);
+        privateDialogs.setFixedCellHeight(44);
+
+
+        JScrollPane listScrollPane = new JScrollPane(privateDialogs);
+
+        JLabel dialogLabel = new JLabel("Мои диалоги", JLabel.CENTER);
+        dialogLabel.setFont(new Font("Meiryo", Font.PLAIN, 16));
+        dialogLabel.setBorder(new EmptyBorder(0, 3, 6, 3));
+
+        pmDialogsScrollPanel.add(dialogLabel, BorderLayout.NORTH);
+
+        pmDialogsScrollPanel.add(listScrollPane, BorderLayout.CENTER);
+        pmDialogsScrollPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 30, 20));
+
+        if (privateMessagePanel != null){
+            privateMessagePanel.add(pmDialogsScrollPanel, BorderLayout.CENTER);
+        }
+    }
+
+    public void setPrivateMessages(Map<String, String> messagesAndAuthor){
 
     }
 
     public void setActiveUsersPanel(Map<String, String> users){
 
-        DefaultListModel<UserLoginAndName> tempUsersList = new DefaultListModel<>();
         activeUsersScrollPanel = new JPanel(new BorderLayout());
+
+        DefaultListModel<UserLoginAndName> tempUsersList = new DefaultListModel<>();
+
 
         for (Map.Entry<String, String> entry : users.entrySet()) {
             tempUsersList.addElement(new UserLoginAndName(entry.getKey(), entry.getValue()));
@@ -379,19 +485,37 @@ public class ClientGUI extends JFrame implements ActionListener{
 
         activeUsers = new JList<>(tempUsersList);
         activeUsers.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+        activeUsers.addListSelectionListener(new ListSelectionListener() {
+            @Override
+            public void valueChanged(ListSelectionEvent listSelectionEvent) {
+                if (!activeUsers.isSelectionEmpty()){
+                    if (activeUsers.getSelectedIndices().length > 1){
+                        openPrivateChat.setText("отправить выбранным");
+                        openPrivateChat.setMargin(new Insets(5, -2, 5, -2));
+                    }
+
+                    if (activeUsers.getSelectedIndices().length <= 1){
+                        openPrivateChat.setText("написать");
+                        openPrivateChat.setMargin(new Insets(5, 0, 5, 0));
+
+                    }
+                }
+            }
+        });
         activeUsers.setVisibleRowCount(8);
         JScrollPane listScrollPane = new JScrollPane(activeUsers);
 
         String  userStr = "Пользователи онлайн";
-        sendPMessageButton = new JButton("написать");
+        openPrivateChat = new JButton("написать");
+        openPrivateChat.addActionListener(this);
 
-        sendPMessageButton.setMargin(new Insets(5, 0, 5, 0));
+        openPrivateChat.setMargin(new Insets(5, 0, 5, 0));
 
         JLabel userLabel = new JLabel(userStr, JLabel.CENTER);
         userLabel.setBorder(new EmptyBorder(0, 3, 6, 3));
 
         activeUsersScrollPanel.add(userLabel, BorderLayout.NORTH);
-        activeUsersScrollPanel.add(sendPMessageButton, BorderLayout.SOUTH);
+        activeUsersScrollPanel.add(openPrivateChat, BorderLayout.SOUTH);
 
         userLabel.setFont(new Font("Meiryo", Font.PLAIN, 16));
 
@@ -408,16 +532,24 @@ public class ClientGUI extends JFrame implements ActionListener{
 
     }
 
-    public JPanel getTextPanel(){
-        String welcome = "Приветствуем вас в нашем чате!\n";
-        textArea = new JTextArea(welcome, 16, 42);
-        textArea.setMargin(new Insets(10, 10, 10, 10));
-//        textArea.setFont(meiryoFont);
 
-        textArea.setLineWrap(true);
-        textArea.setWrapStyleWord(true);
-        textArea.setEditable(false);
-        JScrollPane scrollPane = new JScrollPane(textArea);
+
+    public JPanel getGeneralTextPanel(){
+        String welcome = "Приветствуем вас в нашем чате!\n";
+        generalTextArea = new JTextArea(welcome, 16, 42);
+        generalTextArea.setMargin(new Insets(10, 10, 10, 10));
+
+        generalTextArea.setLineWrap(true);
+        generalTextArea.setWrapStyleWord(true);
+        generalTextArea.setEditable(false);
+
+
+        for (int i = 0; i < generalMessages.size(); i++){
+            generalTextArea.append(generalMessages.get(i));
+        }
+
+
+        JScrollPane scrollPane = new JScrollPane(generalTextArea);
         JPanel textPanel = new JPanel();
         textPanel.add(scrollPane);
 
@@ -436,7 +568,16 @@ public class ClientGUI extends JFrame implements ActionListener{
         return inputPanel;
     }
 
+    public UserLoginAndName findActiveByLogin(String login){
 
+        for (UserLoginAndName user : activeUsers.getSelectedValuesList()){
+            if (user.getLogin().equals(login)){
+                return user;
+            }
+        }
+
+        return null;
+    }
 
     public static void main(String[] args){
 

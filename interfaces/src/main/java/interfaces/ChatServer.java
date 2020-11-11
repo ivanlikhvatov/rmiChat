@@ -15,4 +15,5 @@ public interface ChatServer extends Remote {
     void setGeneralMessage(String message, String login) throws RemoteException;
 
 
+    boolean checkLoggingInUser(String login, char[] password) throws RemoteException;
 }

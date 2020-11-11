@@ -22,14 +22,15 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
     private static final String CHARACTER_FOR_LOGIN = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefhhijklmnopqrstuvwxyz";
 
     private List<User> activeUsers;
+    private List<User> allUsers;
     private List<Message> allMessages;
     private Queue<Message> messagesToSend;
     private List<Thread> senders;
 
-    public ChatServerImpl() throws RemoteException
-    {
+    public ChatServerImpl() throws RemoteException {
         super();
         activeUsers = new ArrayList<>();
+        allUsers = new ArrayList<>();
         allMessages = new ArrayList<>();
         messagesToSend = new ConcurrentLinkedQueue<>();
         senders = new ArrayList<>();
@@ -41,7 +42,7 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
         try{
             ChatClient nextClient = (ChatClient)Naming.lookup("rmi://" + details.get("hostName") + "/" + details.get("clientServiceName"));
 
-            activeUsers.add(new User(
+            User user = (new User(
                     details.get("username"),
                     password,
                     details.get("gender"),
@@ -49,6 +50,9 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                     details.get("clientServiceName"),
                     details.get("login"),
                     nextClient));
+
+            allUsers.add(user);
+            activeUsers.add(user);
 
             updateUserList();
             setAllMessages(nextClient);
@@ -60,6 +64,22 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
         }
 
 
+    }
+
+    @Override
+    public boolean checkLoggingInUser(String login, char[] password) throws RemoteException{
+        for (User user: allUsers) {
+            if (user.getLogin().equals(login) && Arrays.equals(user.getPassword(), password)){
+
+                System.out.println(user.getClient().getClientServiceName());//TODO вылетает ошибка при обращении к любому методу клиента
+
+                user.getClient().identificationUser();
+
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void setAllMessages(ChatClient newClient) {
@@ -304,7 +324,7 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
             List<String[]> userPrivateMessages = new ArrayList<>();
             List<String> passedUsers = new ArrayList<>();
 
-            for (int i = allMessages.size() - 1; i > 0; i--) {
+            for (int i = allMessages.size() - 1; i >= 0; i--) {
                 if (allMessages.get(i).getClass().equals(PrivateMessage.class)){
 
                     PrivateMessage pm = (PrivateMessage) allMessages.get(i);

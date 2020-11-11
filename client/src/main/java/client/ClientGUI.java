@@ -1,5 +1,7 @@
 package client;
 
+import interfaces.ChatClient;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.ListSelectionEvent;
@@ -13,7 +15,6 @@ import java.rmi.RemoteException;
 import static client.ChatClientImpl.*;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -33,13 +34,13 @@ public class ClientGUI extends JFrame implements ActionListener{
     private JList<UserLoginAndName> activeUsers;
     protected JList<DialogLastMessage> privateDialogs;
     private JPanel inputPanel;
-    protected JTextField nameInput, messageInput;
+    protected JTextField nameInput, messageInput, loginInput;
     private JPasswordField passInput;
     private JRadioButton radioMale, radioFemale;
-    protected JButton loginButton, logoutButton, registrationButton, endRegistrationButton,
+    protected JButton getLoginPanelButton, loginButton, logoutButton, getRegistrationPanelButton, registrationButton,
             sendGMButton, sendPMessageButton,
-            getStartPanelButton, getGMPanelButton, getPMPanelButton, getPMDialogPanelButton, openPrivateChat;
-    protected JPanel activeUsersScrollPanel, pmDialogsScrollPanel, generalMessagePanel, privateMessagePanel, PMDialogPanel;
+            getStartPanelButton, getGMPanelButton, getDialogsPanelButton, openPrivateChatButton;
+    protected JPanel activeUsersScrollPanel, pmDialogsScrollPanel, generalMessagePanel, dialogsPanel, privateMessagePanel;
     protected JTextArea generalTextArea, privateTextArea;
 
     public ClientGUI(){
@@ -75,7 +76,7 @@ public class ClientGUI extends JFrame implements ActionListener{
     @Override
     public void actionPerformed(ActionEvent e) {
 
-        if (e.getSource() == registrationButton){
+        if (e.getSource() == getRegistrationPanelButton){
             container.removeAll();
             container.setLayout(new BorderLayout());
             container.add(getRegistrationPanel(), BorderLayout.CENTER);
@@ -89,13 +90,12 @@ public class ClientGUI extends JFrame implements ActionListener{
             container.revalidate();
         }
 
-        if (e.getSource() == endRegistrationButton){
+        if (e.getSource() == registrationButton){
 
-
-            //TODO выкидыает ошибку и регистрирует с null-ом того поля которое не заполнено
             if (nameInput.getText().isEmpty() || passInput.getPassword().length == 0 || (!radioFemale.isSelected() && !radioMale.isSelected())){
                 JOptionPane.showMessageDialog(null, "Заполните все поля!",
                         "Не все поля заполнены", JOptionPane.ERROR_MESSAGE);
+                return;
             }
 
             name = nameInput.getText();
@@ -104,7 +104,7 @@ public class ClientGUI extends JFrame implements ActionListener{
             if (radioMale.isSelected()){
                 gender = radioMale.getName();
             } else if (radioFemale.isSelected()){
-                gender = radioFemale.getText();
+                gender = radioFemale.getName();
             }
 
             try{
@@ -125,6 +125,34 @@ public class ClientGUI extends JFrame implements ActionListener{
             }
 
 
+        }
+
+        if (e.getSource() == loginButton){
+            if (loginInput.getText().isEmpty() || passInput.getPassword().length == 0 ){
+                JOptionPane.showMessageDialog(null, "Заполните все поля!",
+                        "Не все поля заполнены", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            pass = passInput.getPassword();
+
+            try{
+                chatClient = new ChatClientImpl(this, null, null, pass);
+                chatClient.checkLoggingInUser(loginInput.getText(), pass);
+            } catch (RemoteException remoteException){
+                remoteException.printStackTrace();
+            }
+
+
+
+
+
+        }
+
+        if (e.getSource() == getLoginPanelButton){
+            container.removeAll();
+            container.setLayout(new BorderLayout());
+            container.add(getLoginPanel(), BorderLayout.CENTER);
+            container.revalidate();
         }
 
 
@@ -163,15 +191,15 @@ public class ClientGUI extends JFrame implements ActionListener{
             container.revalidate();
         }
 
-        if (e.getSource() == getPMPanelButton){
+        if (e.getSource() == getDialogsPanelButton){
             container.removeAll();
             container.setLayout(new BorderLayout());
-            container.add(getPrivateMessagePanel(), BorderLayout.CENTER);
+            container.add(getDialogsPanel(), BorderLayout.CENTER);
             container.revalidate();
         }
 
 
-        if(e.getSource() == openPrivateChat){
+        if(e.getSource() == openPrivateChatButton){
             if (activeUsers.getSelectedIndices().length > 1){
                 List<String> loginList = new ArrayList<>();
 
@@ -185,12 +213,19 @@ public class ClientGUI extends JFrame implements ActionListener{
                     remoteException.printStackTrace();
                 }
 
-            } else {
+            } else if (activeUsers.getSelectedIndices().length != 0){
                 addressee = activeUsers.getSelectedValue();
 
                 container.removeAll();
                 container.setLayout(new BorderLayout());
-                container.add(getPrivateDialogPanel(), BorderLayout.CENTER);
+                container.add(getPrivateMessagePanel(), BorderLayout.CENTER);
+                container.revalidate();
+            } else if (privateDialogs.getSelectedIndices().length != 0){
+                addressee = privateDialogs.getSelectedValue().getInterlocutor();
+
+                container.removeAll();
+                container.setLayout(new BorderLayout());
+                container.add(getPrivateMessagePanel(), BorderLayout.CENTER);
                 container.revalidate();
             }
 
@@ -198,31 +233,82 @@ public class ClientGUI extends JFrame implements ActionListener{
         }
 
         if (e.getSource() == sendPMessageButton){
-            if (activeUsers.getSelectedIndices().length > 1){
-                List<String> loginList = new ArrayList<>();
 
-                for (UserLoginAndName user : activeUsers.getSelectedValuesList()){
-                    loginList.add(user.getLogin());
-                }
-
-                try{
-                    chatClient.sendPrivateMessage(loginList, messageInput.getText());
-                } catch (RemoteException remoteException){
-                    remoteException.printStackTrace();
-                }
-
-
-            } else {
-                UserLoginAndName addressee = activeUsers.getSelectedValue();
-
-                try{
-                    chatClient.sendPrivateMessage(addressee.getLogin(), messageInput.getText());
-                } catch (RemoteException remoteException){
-                    remoteException.printStackTrace();
-                }
+            try{
+                chatClient.sendPrivateMessage(addressee.getLogin(), messageInput.getText());
+            } catch (RemoteException remoteException){
+                remoteException.printStackTrace();
             }
+
         }
 
+    }
+    public JPanel getStartPanel(){
+
+        JPanel gridPanel = new JPanel(new GridLayout(1, 2, 5, 0));
+
+        JLabel label = new JLabel("Войдите или зарегистрируйтесь");
+
+
+        getLoginPanelButton = new JButton("Войти ");
+        getLoginPanelButton.addActionListener(this);
+
+        getRegistrationPanelButton = new JButton("Зарегистрироваться ");
+        getRegistrationPanelButton.addActionListener(this);
+
+        gridPanel.add(getLoginPanelButton);
+        gridPanel.add(getRegistrationPanelButton);
+
+
+        JPanel startPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 70));
+        startPanel.add(label);
+        startPanel.add(gridPanel);
+
+        return startPanel;
+    }
+
+    public JPanel getLoginPanel(){
+        JPanel loginPanel = new JPanel(new BorderLayout());
+
+        SpringLayout layout = new SpringLayout();
+        loginPanel.setLayout(layout);
+
+        JLabel loginLabel = new JLabel("Логин: ");
+        loginInput = new JTextField("", 20);
+
+        JLabel passLabel = new JLabel("Пароль: ");
+        passInput = new JPasswordField("", 20);
+
+        loginButton = new JButton("войти");
+        loginButton.addActionListener(this);
+
+        getStartPanelButton = new JButton("вернуться в главное меню");
+        getStartPanelButton.addActionListener(this);
+
+        layout.putConstraint(SpringLayout.WEST , loginLabel, 10, SpringLayout.WEST , loginPanel);
+        layout.putConstraint(SpringLayout.NORTH, loginLabel, 28, SpringLayout.NORTH, loginPanel);
+        layout.putConstraint(SpringLayout.NORTH, loginInput, 25, SpringLayout.NORTH, loginPanel);
+        layout.putConstraint(SpringLayout.WEST , loginInput, 49, SpringLayout.EAST , loginLabel);
+
+        layout.putConstraint(SpringLayout.WEST , passLabel, 10, SpringLayout.WEST , loginPanel);
+        layout.putConstraint(SpringLayout.NORTH, passLabel, 56, SpringLayout.NORTH, loginPanel);
+        layout.putConstraint(SpringLayout.NORTH, passInput, 50, SpringLayout.NORTH, loginPanel);
+        layout.putConstraint(SpringLayout.WEST , passInput, 40, SpringLayout.EAST , passLabel);
+
+        layout.putConstraint(SpringLayout.NORTH, loginButton, 100, SpringLayout.NORTH, loginPanel);
+        layout.putConstraint(SpringLayout.NORTH, getStartPanelButton, 100, SpringLayout.NORTH, loginPanel);
+        layout.putConstraint(SpringLayout.WEST , getStartPanelButton, 5, SpringLayout.EAST , loginButton);
+
+        loginPanel.add(loginLabel);
+        loginPanel.add(loginInput);
+        loginPanel.add(passLabel);
+        loginPanel.add(passInput);
+
+        loginPanel.add(loginButton);
+        loginPanel.add(getStartPanelButton);
+
+
+        return loginPanel;
     }
 
     public JPanel getRegistrationPanel(){
@@ -250,9 +336,9 @@ public class ClientGUI extends JFrame implements ActionListener{
         buttonGroup.add(radioMale);
         buttonGroup.add(radioFemale);
 
-        endRegistrationButton = new JButton("Регистрация");
-        endRegistrationButton.addActionListener(this);
-        getStartPanelButton = new JButton("Вернуться в главное меню");
+        registrationButton = new JButton("регистрация");
+        registrationButton.addActionListener(this);
+        getStartPanelButton = new JButton("вернуться в главное меню");
         getStartPanelButton.addActionListener(this);
 
         layout.putConstraint(SpringLayout.WEST , nameLabel, 10, SpringLayout.WEST , registrationPanel);
@@ -273,9 +359,9 @@ public class ClientGUI extends JFrame implements ActionListener{
         layout.putConstraint(SpringLayout.NORTH, radioFemale, 88, SpringLayout.NORTH, registrationPanel);
         layout.putConstraint(SpringLayout.WEST , radioFemale, 90, SpringLayout.EAST , genderLabel);
 
-        layout.putConstraint(SpringLayout.NORTH, endRegistrationButton, 140, SpringLayout.NORTH, registrationPanel);
+        layout.putConstraint(SpringLayout.NORTH, registrationButton, 140, SpringLayout.NORTH, registrationPanel);
         layout.putConstraint(SpringLayout.NORTH, getStartPanelButton, 140, SpringLayout.NORTH, registrationPanel);
-        layout.putConstraint(SpringLayout.WEST , getStartPanelButton, 5, SpringLayout.EAST , endRegistrationButton);
+        layout.putConstraint(SpringLayout.WEST , getStartPanelButton, 5, SpringLayout.EAST , registrationButton);
 
         registrationPanel.add(nameLabel);
         registrationPanel.add(nameInput);
@@ -284,35 +370,11 @@ public class ClientGUI extends JFrame implements ActionListener{
         registrationPanel.add(genderLabel);
         registrationPanel.add(radioMale);
         registrationPanel.add(radioFemale);
-        registrationPanel.add(endRegistrationButton);
+        registrationPanel.add(registrationButton);
         registrationPanel.add(getStartPanelButton);
 
 
         return registrationPanel;
-    }
-
-    public JPanel getStartPanel(){
-
-        JPanel gridPanel = new JPanel(new GridLayout(1, 2, 5, 0));
-
-        JLabel label = new JLabel("Войдите или зарегистрируйтесь");
-
-
-        loginButton = new JButton("Войти ");
-        loginButton.addActionListener(this);
-
-        registrationButton = new JButton("Зарегистрироваться ");
-        registrationButton.addActionListener(this);
-
-        gridPanel.add(loginButton);
-        gridPanel.add(registrationButton);
-
-
-        JPanel startPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 70));
-        startPanel.add(label);
-        startPanel.add(gridPanel);
-
-        return startPanel;
     }
 
     public JPanel getGeneralMessagePanel(){
@@ -322,8 +384,8 @@ public class ClientGUI extends JFrame implements ActionListener{
         getGMPanelButton = new JButton("общие сообщения");
         getGMPanelButton.addActionListener(this);
 
-        getPMPanelButton = new JButton("личные сообщения");
-        getPMPanelButton.addActionListener(this);
+        getDialogsPanelButton = new JButton("личные сообщения");
+        getDialogsPanelButton.addActionListener(this);
 
         sendGMButton = new JButton("отправить");
         sendGMButton.setMargin(new Insets(5, 10, 5, 10));
@@ -335,7 +397,7 @@ public class ClientGUI extends JFrame implements ActionListener{
 
         JPanel chooseTypeMessagePanel = new JPanel(new GridLayout(1, 2, 28, 0));
         chooseTypeMessagePanel.add(getGMPanelButton);
-        chooseTypeMessagePanel.add(getPMPanelButton);
+        chooseTypeMessagePanel.add(getDialogsPanelButton);
 
         JPanel flowLeft = new JPanel(new FlowLayout(FlowLayout.LEFT));
         flowLeft.add(chooseTypeMessagePanel);
@@ -357,29 +419,28 @@ public class ClientGUI extends JFrame implements ActionListener{
         flowLeftAndRight.add(flowRight);
 
         generalMessagePanel.add(flowLeftAndRight, BorderLayout.NORTH);
-//        generalMessagePanel.add(flowRight, BorderLayout.NORTH);
-
         generalMessagePanel.add(getInputPanel(), BorderLayout.SOUTH);
         inputPanel.add(sendGMButton, BorderLayout.WEST);
         generalMessagePanel.add(getGeneralTextPanel(), BorderLayout.CENTER);
-
-
         generalMessagePanel.add(activeUsersScrollPanel, BorderLayout.WEST);
 
-//        generalMessagePanel.setBorder(blankBorder);
+
+        activeUsers.removeSelectionInterval(0, activeUsers.getModel().getSize() - 1);
+        privateDialogs.removeSelectionInterval(0, privateDialogs.getModel().getSize() - 1);
+        activeUsers.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
 
         return generalMessagePanel;
     }
 
-    public JPanel getPrivateMessagePanel(){
+    public JPanel getDialogsPanel(){
 
-        privateMessagePanel = new JPanel(new BorderLayout());
+        dialogsPanel = new JPanel(new BorderLayout());
 
         getGMPanelButton = new JButton("общие сообщения");
         getGMPanelButton.addActionListener(this);
 
-        getPMPanelButton = new JButton("личные сообщения");
-        getPMPanelButton.addActionListener(this);
+        getDialogsPanelButton = new JButton("личные сообщения");
+        getDialogsPanelButton.addActionListener(this);
 
         logoutButton = new JButton("выйти");
         logoutButton.addActionListener(this);
@@ -387,7 +448,7 @@ public class ClientGUI extends JFrame implements ActionListener{
 
         JPanel chooseTypeMessagePanel = new JPanel(new GridLayout(1, 2, 28, 0));
         chooseTypeMessagePanel.add(getGMPanelButton);
-        chooseTypeMessagePanel.add(getPMPanelButton);
+        chooseTypeMessagePanel.add(getDialogsPanelButton);
 
         JPanel flowLeft = new JPanel(new FlowLayout(FlowLayout.LEFT));
         flowLeft.add(chooseTypeMessagePanel);
@@ -414,19 +475,64 @@ public class ClientGUI extends JFrame implements ActionListener{
             setPrivateDialogsPanel(emptyDialogs);
         }
 
+        activeUsers.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
+        dialogsPanel.add(flowLeftAndRight, BorderLayout.NORTH);
+        dialogsPanel.add(activeUsersScrollPanel, BorderLayout.WEST);
+        dialogsPanel.add(pmDialogsScrollPanel, BorderLayout.CENTER);
 
-        privateMessagePanel.add(flowLeftAndRight, BorderLayout.NORTH);
-        privateMessagePanel.add(activeUsersScrollPanel, BorderLayout.WEST);
-        privateMessagePanel.add(pmDialogsScrollPanel, BorderLayout.CENTER);
+        activeUsers.removeSelectionInterval(0, activeUsers.getModel().getSize() - 1);
+        privateDialogs.removeSelectionInterval(0, privateDialogs.getModel().getSize() - 1);
 
-        return privateMessagePanel;
+        return dialogsPanel;
     }
 
-    public JPanel getPrivateDialogPanel(){
-        PMDialogPanel = new JPanel(new BorderLayout());
+    public JPanel getPrivateMessagePanel(){
+        privateMessagePanel = new JPanel(new BorderLayout());
 
-        return PMDialogPanel;
+        sendPMessageButton = new JButton("отправить");
+        sendPMessageButton.setMargin(new Insets(5, 10, 5, 10));
+        sendPMessageButton.addActionListener(this);
+
+        getGMPanelButton = new JButton("общие сообщения");
+        getGMPanelButton.addActionListener(this);
+
+        getDialogsPanelButton = new JButton("личные сообщения");
+        getDialogsPanelButton.addActionListener(this);
+
+        logoutButton = new JButton("выйти");
+        logoutButton.addActionListener(this);
+
+
+        JPanel chooseTypeMessagePanel = new JPanel(new GridLayout(1, 2, 28, 0));
+        chooseTypeMessagePanel.add(getGMPanelButton);
+        chooseTypeMessagePanel.add(getDialogsPanelButton);
+
+        JPanel flowLeft = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        flowLeft.add(chooseTypeMessagePanel);
+        flowLeft.setBorder(new EmptyBorder(5, 0, -5, 0));
+
+
+
+        JPanel logoutPanel = new JPanel(new GridLayout(1, 2, 5, 0));
+        logoutPanel.add(logoutButton);
+
+        JPanel flowRight = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        flowRight.add(logoutPanel);
+        flowRight.setBorder(new EmptyBorder(5, 0, -5, 0));
+
+
+        JPanel flowLeftAndRight = new JPanel(new GridLayout(1, 2, 5, 0));
+
+        flowLeftAndRight.add(flowLeft);
+        flowLeftAndRight.add(flowRight);
+
+        privateMessagePanel.add(getInputPanel(), BorderLayout.SOUTH);
+        inputPanel.add(sendPMessageButton, BorderLayout.WEST);
+        privateMessagePanel.add(flowLeftAndRight, BorderLayout.NORTH);
+        privateMessagePanel.add(getPrivateTextPanel(), BorderLayout.CENTER);
+
+        return privateMessagePanel;
     }
 
     public void setPrivateDialogsPanel(List<String[]> interlocutorsAndLastMessage){
@@ -436,6 +542,7 @@ public class ClientGUI extends JFrame implements ActionListener{
         DefaultListModel<DialogLastMessage> tempPrivateMessages = new DefaultListModel<>();
 
         for (String[] messageDetails : interlocutorsAndLastMessage){
+
             String login = messageDetails[0];
             String username = messageDetails[1];
             String message = messageDetails[2];
@@ -450,9 +557,11 @@ public class ClientGUI extends JFrame implements ActionListener{
 
         privateDialogs.setVisibleRowCount(2);
         privateDialogs.setFixedCellHeight(44);
-
+        privateDialogs.setCellRenderer(getRenderer());
 
         JScrollPane listScrollPane = new JScrollPane(privateDialogs);
+        listScrollPane.setHorizontalScrollBarPolicy(listScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+
 
         JLabel dialogLabel = new JLabel("Мои диалоги", JLabel.CENTER);
         dialogLabel.setFont(new Font("Meiryo", Font.PLAIN, 16));
@@ -463,13 +572,27 @@ public class ClientGUI extends JFrame implements ActionListener{
         pmDialogsScrollPanel.add(listScrollPane, BorderLayout.CENTER);
         pmDialogsScrollPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 30, 20));
 
-        if (privateMessagePanel != null){
-            privateMessagePanel.add(pmDialogsScrollPanel, BorderLayout.CENTER);
+
+
+        if (dialogsPanel != null){
+            dialogsPanel.add(pmDialogsScrollPanel, BorderLayout.CENTER);
         }
-    }
 
-    public void setPrivateMessages(Map<String, String> messagesAndAuthor){
 
+        privateDialogs.addListSelectionListener(new ListSelectionListener() {
+            @Override
+            public void valueChanged(ListSelectionEvent listSelectionEvent) {
+                if (!privateDialogs.isSelectionEmpty()){
+
+                    if (activeUsers != null && activeUsers.getSelectedIndices().length != 0){
+                        activeUsers.removeSelectionInterval(0, activeUsers.getModel().getSize());
+                        openPrivateChatButton.setText("написать");
+                        openPrivateChatButton.setMargin(new Insets(5, 0, 5, 0));
+                    }
+
+                }
+            }
+        });
     }
 
     public void setActiveUsersPanel(Map<String, String> users){
@@ -489,16 +612,42 @@ public class ClientGUI extends JFrame implements ActionListener{
             @Override
             public void valueChanged(ListSelectionEvent listSelectionEvent) {
                 if (!activeUsers.isSelectionEmpty()){
+
                     if (activeUsers.getSelectedIndices().length > 1){
-                        openPrivateChat.setText("отправить выбранным");
-                        openPrivateChat.setMargin(new Insets(5, -2, 5, -2));
+                        openPrivateChatButton.setText("отправить выбранным");
+                        openPrivateChatButton.setMargin(new Insets(5, -2, 5, -2));
+                    }
+
+                    if (privateDialogs != null && privateDialogs.getSelectedIndices().length != 0){
+                        privateDialogs.removeSelectionInterval(0, privateDialogs.getModel().getSize());
                     }
 
                     if (activeUsers.getSelectedIndices().length <= 1){
-                        openPrivateChat.setText("написать");
-                        openPrivateChat.setMargin(new Insets(5, 0, 5, 0));
+                        openPrivateChatButton.setText("написать");
+                        openPrivateChatButton.setMargin(new Insets(5, 0, 5, 0));
 
                     }
+
+                    if (activeUsers.getSelectedValue().getLogin().equals(login)){
+
+                        activeUsers.removeSelectionInterval(activeUsers.getSelectedIndex(), activeUsers.getSelectedIndex());
+                    }
+
+                    //TODO убрать возможность выбора самого себя
+
+//                    for (UserLoginAndName userLoginAndName : activeUsers.getSelectedValuesList()){
+//                        if (userLoginAndName.getLogin().equals(login)){
+//                            activeUsers.removeSelectionInterval(activeUsers.getComponent(1));
+//                        }
+//                    }
+
+
+                    for (int i = 1; i < activeUsers.getModel().getSize(); i++){
+                        if (activeUsers.getModel().getElementAt(i).getLogin().equals(login)){
+                            activeUsers.removeSelectionInterval(i, i);
+                        }
+                    }
+
                 }
             }
         });
@@ -506,16 +655,16 @@ public class ClientGUI extends JFrame implements ActionListener{
         JScrollPane listScrollPane = new JScrollPane(activeUsers);
 
         String  userStr = "Пользователи онлайн";
-        openPrivateChat = new JButton("написать");
-        openPrivateChat.addActionListener(this);
+        openPrivateChatButton = new JButton("написать");
+        openPrivateChatButton.addActionListener(this);
 
-        openPrivateChat.setMargin(new Insets(5, 0, 5, 0));
+        openPrivateChatButton.setMargin(new Insets(5, 0, 5, 0));
 
         JLabel userLabel = new JLabel(userStr, JLabel.CENTER);
         userLabel.setBorder(new EmptyBorder(0, 3, 6, 3));
 
         activeUsersScrollPanel.add(userLabel, BorderLayout.NORTH);
-        activeUsersScrollPanel.add(openPrivateChat, BorderLayout.SOUTH);
+        activeUsersScrollPanel.add(openPrivateChatButton, BorderLayout.SOUTH);
 
         userLabel.setFont(new Font("Meiryo", Font.PLAIN, 16));
 
@@ -526,13 +675,11 @@ public class ClientGUI extends JFrame implements ActionListener{
             generalMessagePanel.add(activeUsersScrollPanel, BorderLayout.WEST);
         }
 
-        if (privateMessagePanel != null){
-            privateMessagePanel.add(activeUsersScrollPanel, BorderLayout.WEST);
+        if (dialogsPanel != null){
+            dialogsPanel.add(activeUsersScrollPanel, BorderLayout.WEST);
         }
 
     }
-
-
 
     public JPanel getGeneralTextPanel(){
         String welcome = "Приветствуем вас в нашем чате!\n";
@@ -557,11 +704,34 @@ public class ClientGUI extends JFrame implements ActionListener{
         return textPanel;
     }
 
+    public JPanel getPrivateTextPanel(){
+
+        privateTextArea = new JTextArea( 16, 42);
+        privateTextArea.setMargin(new Insets(10, 10, 10, 10));
+
+        privateTextArea.setLineWrap(true);
+        privateTextArea.setWrapStyleWord(true);
+        privateTextArea.setEditable(false);
+
+
+        for (PrivateMessage privateMessage : privateMessages) {
+            if (privateMessage.getSender().getLogin().equals(addressee.getLogin()) || privateMessage.getAddressee().getLogin().equals(addressee.getLogin())) {
+                privateTextArea.append(privateMessage.getText());
+            }
+        }
+
+
+        JScrollPane scrollPane = new JScrollPane(privateTextArea);
+        JPanel textPanel = new JPanel();
+        textPanel.add(scrollPane);
+
+        textPanel.setFont(new Font("Meiryo", Font.PLAIN, 14));
+        return textPanel;
+    }
+
     public JPanel getInputPanel(){
         inputPanel = new JPanel(new BorderLayout());
-//        inputPanel.setBorder(blankBorder);
         messageInput = new JTextField();
-//        textField.setFont(meiryoFont);
         inputPanel.add(messageInput, BorderLayout.CENTER);
 
         inputPanel.setBorder(new EmptyBorder(10, 8, 10, 8));
@@ -577,6 +747,19 @@ public class ClientGUI extends JFrame implements ActionListener{
         }
 
         return null;
+    }
+
+    private ListCellRenderer<? super DialogLastMessage> getRenderer() {
+        return new DefaultListCellRenderer(){
+            @Override
+            public Component getListCellRendererComponent(JList<?> list,
+                                                          Object value, int index, boolean isSelected,
+                                                          boolean cellHasFocus) {
+                JLabel listCellRendererComponent = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected,cellHasFocus);
+                listCellRendererComponent.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0,Color.BLACK));
+                return listCellRendererComponent;
+            }
+        };
     }
 
     public static void main(String[] args){

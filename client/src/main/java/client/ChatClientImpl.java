@@ -39,11 +39,17 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         this.username = username;
         this.gender = gender;
         this.password = password;
-        this.login = generateRandomLogin();
+
+        if (username != null){
+            this.login = generateRandomLogin();
+        }
+
         clientGUI.login = this.login;
+
+        System.out.println(login);
     }
 
-
+    @Override
     public void identificationUser() throws RemoteException{
         clientServiceName = "Client_" + username + "_" + login;
 
@@ -80,6 +86,31 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         System.out.println("Client Listen RMI Server is running...\n");
     }
 
+
+    @Override
+    public void checkLoggingInUser(String login, char[] password) throws RemoteException{
+        try {
+            clientServiceName = "temp123";
+
+            Naming.rebind("rmi://" + hostName + "/" + clientServiceName, this);
+            chatServer = (ChatServer) Naming.lookup(UNIC_BINDING_NAME);
+
+            chatServer.checkLoggingInUser(login, password);
+
+        }
+        catch (ConnectException  e) {
+            JOptionPane.showMessageDialog(
+                    clientGUI.frame, "The server seems to be unavailable\nPlease try later",
+                    "Connection problem", JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace();
+        }
+        catch(NotBoundException | MalformedURLException me){
+            me.printStackTrace();
+        }
+
+
+    }
+
     public void registerWithServer(Map<String, String> details, char[] password) {
         try{
             chatServer.connect(details, password);
@@ -113,7 +144,6 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
 
     @Override
     public void generalMessageFromServer(String message){
-        System.out.println( message );
 
         clientGUI.generalMessages.add(message);
 
@@ -141,9 +171,11 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
 
 
 
-        if (clientGUI.privateMessagePanel != null){
-            clientGUI.privateMessagePanel.remove(clientGUI.pmDialogsScrollPanel);
+        if (clientGUI.dialogsPanel != null){
+            clientGUI.dialogsPanel.remove(clientGUI.pmDialogsScrollPanel);
         }
+
+
 
         clientGUI.setPrivateDialogsPanel(interlocutorsAndLastMessage);
 
@@ -193,7 +225,6 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         return sb.toString();
     }
 
-
     public String getHostName() {
         return hostName;
     }
@@ -241,10 +272,6 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
     public void setServiceName(String serviceName) {
         this.serviceName = serviceName;
     }
-
-
-
-
 
     public void setClientServiceName(String clientServiceName) {
         this.clientServiceName = clientServiceName;
@@ -350,7 +377,7 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
 
         @Override
         public String toString() {
-            return interlocutor.getUsername() + "\n" + lastMessage;
+            return "<html>" + "<font size='5' style='bold'>" + interlocutor.getUsername() + "</font>" + "<br/>" + lastMessage + "</html>";
         }
     }
 }

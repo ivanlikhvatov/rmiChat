@@ -39,19 +39,27 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         this.username = username;
         this.gender = gender;
         this.password = password;
+        this.login = generateRandomLogin();
 
-        if (username != null){
-            this.login = generateRandomLogin();
-        }
-
-        clientGUI.login = this.login;
+        clientGUI.login = this.login;//TODO
 
         System.out.println(login);
+
     }
+
+    public ChatClientImpl(ClientGUI clientGUI, String login, char[] password) throws RemoteException {
+        super();
+        this.clientGUI = clientGUI;
+        this.password = password;
+        this.login = login;
+    }
+
+
+
 
     @Override
     public void identificationUser() throws RemoteException{
-        clientServiceName = "Client_" + username + "_" + login;
+        clientServiceName = "Client_" + login;
 
         Map<String, String> details = new HashMap<>();
         details.put("username", username);
@@ -86,16 +94,24 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         System.out.println("Client Listen RMI Server is running...\n");
     }
 
+    @Override
+    public void setDataAfterLogin(String name, String gender){
+        this.username = name;
+        this.gender = gender;
+
+        clientGUI.setDataAfterLogin(name, gender);
+    }
+
 
     @Override
-    public void checkLoggingInUser(String login, char[] password) throws RemoteException{
+    public boolean checkLoggingInUser(String login, char[] password) throws RemoteException{
         try {
-            clientServiceName = "temp123";
+            clientServiceName = "Client_" + login;
 
             Naming.rebind("rmi://" + hostName + "/" + clientServiceName, this);
             chatServer = (ChatServer) Naming.lookup(UNIC_BINDING_NAME);
 
-            chatServer.checkLoggingInUser(login, password);
+            return chatServer.checkLoggingInUser(login, password);
 
         }
         catch (ConnectException  e) {
@@ -109,20 +125,16 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         }
 
 
+        return false;
     }
 
     public void registerWithServer(Map<String, String> details, char[] password) {
         try{
-            chatServer.connect(details, password);
+            chatServer.connectNewUser(details, password);
         }
         catch(Exception e){
             e.printStackTrace();
         }
-    }
-
-    @Override
-    public void setGeneralMessages(List<String> messages){
-        clientGUI.generalMessages.addAll(messages);
     }
 
     @Override
@@ -166,11 +178,6 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         pm.setSender(new UserLoginAndName(messageDetails.get("authorLogin"), messageDetails.get("authorName")));
         pm.setText(messageDetails.get("message"));
 
-
-
-
-
-
         if (clientGUI.dialogsPanel != null){
             clientGUI.dialogsPanel.remove(clientGUI.pmDialogsScrollPanel);
         }
@@ -198,6 +205,26 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
 
 
     }
+
+    @Override
+    public void privateMessageFromServer(List<String[]> messages, List<String[]> interlocutorsAndLastMessage) throws RemoteException {
+
+        for (String[] messageDetails: messages) {
+            PrivateMessage pm = new PrivateMessage();
+
+            pm.setAddressee(new UserLoginAndName(messageDetails[3], messageDetails[2]));
+            pm.setSender(new UserLoginAndName(messageDetails[1], messageDetails[0]));
+            pm.setText(messageDetails[4]);
+            clientGUI.privateMessages.add(pm);
+        }
+
+
+        clientGUI.setPrivateDialogsPanel(interlocutorsAndLastMessage);
+
+
+    }
+
+
 
     @Override
     public String getClientServiceName() {
@@ -275,6 +302,24 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
 
     public void setClientServiceName(String clientServiceName) {
         this.clientServiceName = clientServiceName;
+    }
+
+    public void changePersonalData(String name, String gender, char[] pass) {
+        this.username = name;
+        this.gender = gender;
+        this.password = pass;
+
+        String[] details = new String[3];
+        details[0] = login;
+        details[1] = name;
+        details[2] = gender;
+
+        try {
+            chatServer.changePersonalData(details, pass);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+
     }
 
     static class UserLoginAndName {
@@ -379,5 +424,21 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         public String toString() {
             return "<html>" + "<font size='5' style='bold'>" + interlocutor.getUsername() + "</font>" + "<br/>" + lastMessage + "</html>";
         }
+    }
+
+
+    @Override
+    public String toString() {
+        return "ChatClientImpl{" +
+                "hostName='" + hostName + '\'' +
+                ", clientGUI=" + clientGUI +
+                ", username='" + username + '\'' +
+                ", gender='" + gender + '\'' +
+                ", password=" + Arrays.toString(password) +
+                ", login='" + login + '\'' +
+                ", serviceName='" + serviceName + '\'' +
+                ", clientServiceName='" + clientServiceName + '\'' +
+                ", chatServer=" + chatServer +
+                '}';
     }
 }

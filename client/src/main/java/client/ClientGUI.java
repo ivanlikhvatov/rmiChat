@@ -15,6 +15,7 @@ import java.rmi.RemoteException;
 import static client.ChatClientImpl.*;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -39,7 +40,7 @@ public class ClientGUI extends JFrame implements ActionListener{
     private JRadioButton radioMale, radioFemale;
     protected JButton getLoginPanelButton, loginButton, logoutButton, getRegistrationPanelButton, registrationButton,
             sendGMButton, sendPMessageButton,
-            getStartPanelButton, getGMPanelButton, getDialogsPanelButton, openPrivateChatButton;
+            getStartPanelButton, getGMPanelButton, getDialogsPanelButton, openPrivateChatButton, getPersonalDataPanelButton, savePersonalDataChangesButton;
     protected JPanel activeUsersScrollPanel, pmDialogsScrollPanel, generalMessagePanel, dialogsPanel, privateMessagePanel;
     protected JTextArea generalTextArea, privateTextArea;
 
@@ -65,7 +66,6 @@ public class ClientGUI extends JFrame implements ActionListener{
                 System.exit(0);
             }
         });
-
 
 
         container.setLayout(new BorderLayout());
@@ -127,6 +127,41 @@ public class ClientGUI extends JFrame implements ActionListener{
 
         }
 
+        if (e.getSource() == getPersonalDataPanelButton){
+            container.removeAll();
+            container.setLayout(new BorderLayout());
+            container.add(getPersonalDataPanel(), BorderLayout.CENTER);
+            container.revalidate();
+        }
+
+        if (e.getSource() == savePersonalDataChangesButton){
+            if (nameInput.getText().isEmpty() || passInput.getPassword().length == 0 || (!radioFemale.isSelected() && !radioMale.isSelected())){
+                JOptionPane.showMessageDialog(null, "Заполните все поля!",
+                        "Не все поля заполнены", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            String newGender = "";
+
+            if (radioMale.isSelected()){
+                newGender = radioMale.getName();
+            } else if (radioFemale.isSelected()){
+                newGender = radioFemale.getName();
+            }
+
+            if (name.equals(nameInput.getText()) && Arrays.equals(passInput.getPassword(), pass) && newGender.equals(gender)){
+                return;
+            }
+
+            name = nameInput.getText();
+            pass = passInput.getPassword();
+            gender = newGender;
+
+
+            chatClient.changePersonalData(name, gender, pass);
+
+        }
+
         if (e.getSource() == loginButton){
             if (loginInput.getText().isEmpty() || passInput.getPassword().length == 0 ){
                 JOptionPane.showMessageDialog(null, "Заполните все поля!",
@@ -134,17 +169,29 @@ public class ClientGUI extends JFrame implements ActionListener{
                 return;
             }
             pass = passInput.getPassword();
+            login = loginInput.getText();
 
             try{
-                chatClient = new ChatClientImpl(this, null, null, pass);
-                chatClient.checkLoggingInUser(loginInput.getText(), pass);
+                chatClient = new ChatClientImpl(this, login, pass);
+
+
+                if (chatClient.checkLoggingInUser(loginInput.getText(), pass)){
+
+                    container.removeAll();
+                    container.setLayout(new BorderLayout());
+                    container.add(getGeneralMessagePanel(), BorderLayout.CENTER);
+                    container.revalidate();
+
+                    this.setBounds(300,200,750,400);
+
+                } else {
+                    JOptionPane.showMessageDialog(null, "Попробуйте другую комбинацию",
+                            "Пользователя с таким логином и паролем не существует", JOptionPane.ERROR_MESSAGE);
+                }
+
             } catch (RemoteException remoteException){
                 remoteException.printStackTrace();
             }
-
-
-
-
 
         }
 
@@ -377,6 +424,128 @@ public class ClientGUI extends JFrame implements ActionListener{
         return registrationPanel;
     }
 
+    public JPanel getPersonalDataPanel(){
+
+        JPanel personalPanel = new JPanel(new BorderLayout());
+
+        JPanel springLayout = new JPanel(new SpringLayout());
+
+        SpringLayout layout = new SpringLayout();
+        springLayout.setLayout(layout);
+
+        JLabel loginLabel = new JLabel("Логин: ");
+        JTextArea loginText = new JTextArea(login, 1, 20);
+        loginText.setBorder(BorderFactory.createEtchedBorder(1));
+        loginText.setEditable(false);
+
+        JLabel nameLabel = new JLabel("Имя: ");
+        nameInput = new JTextField(name, 20);
+
+        JLabel passLabel = new JLabel("Пароль: ");
+        passInput = new JPasswordField(Arrays.toString(pass).replaceAll("[, \\[\\]]",""), 20);
+
+        JLabel genderLabel = new JLabel("Укажите пол: ");
+        radioMale = new JRadioButton("муж");
+        radioMale.setName("male");
+        radioFemale = new JRadioButton("жен");
+        radioFemale.setName("female");
+        ButtonGroup buttonGroup = new ButtonGroup();
+        buttonGroup.add(radioMale);
+        buttonGroup.add(radioFemale);
+
+        if (gender.equals("male")){
+            radioMale.setSelected(true);
+        }
+
+        if (gender.equals("female")){
+            radioFemale.setSelected(true);
+        }
+
+        getGMPanelButton = new JButton("общие сообщения");
+        getGMPanelButton.addActionListener(this);
+
+        getDialogsPanelButton = new JButton("личные сообщения");
+        getDialogsPanelButton.addActionListener(this);
+
+        logoutButton = new JButton("выйти");
+        logoutButton.addActionListener(this);
+
+        getPersonalDataPanelButton = new JButton("личный кабинет");
+        getPersonalDataPanelButton.addActionListener(this);
+
+        savePersonalDataChangesButton = new JButton("сохранить измениния");
+        savePersonalDataChangesButton.addActionListener(this);
+
+        JPanel chooseTypeMessagePanel = new JPanel(new GridLayout(1, 2, 28, 0));
+        chooseTypeMessagePanel.add(getGMPanelButton);
+        chooseTypeMessagePanel.add(getDialogsPanelButton);
+
+        JPanel flowLeft = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        flowLeft.add(chooseTypeMessagePanel);
+        flowLeft.setBorder(new EmptyBorder(5, 0, -5, 0));
+
+
+
+        JPanel logoutPanel = new JPanel(new GridLayout(1, 2, 5, 0));
+        logoutPanel.add(getPersonalDataPanelButton);
+        logoutPanel.add(logoutButton);
+
+
+        JPanel flowRight = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        flowRight.add(logoutPanel);
+        flowRight.setBorder(new EmptyBorder(5, 0, -5, 0));
+
+
+        JPanel flowLeftAndRight = new JPanel(new GridLayout(1, 2, 5, 0));
+
+        flowLeftAndRight.add(flowLeft);
+        flowLeftAndRight.add(flowRight);
+
+        personalPanel.add(flowLeftAndRight, BorderLayout.NORTH);
+
+
+        layout.putConstraint(SpringLayout.WEST , loginLabel, 10, SpringLayout.WEST , springLayout);
+        layout.putConstraint(SpringLayout.NORTH, loginLabel, 28, SpringLayout.NORTH, springLayout);
+        layout.putConstraint(SpringLayout.NORTH, loginText, 25, SpringLayout.NORTH, springLayout);
+        layout.putConstraint(SpringLayout.WEST , loginText, 53, SpringLayout.EAST , loginLabel);
+
+        layout.putConstraint(SpringLayout.WEST , nameLabel, 10, SpringLayout.WEST , springLayout);
+        layout.putConstraint(SpringLayout.NORTH, nameLabel, 56, SpringLayout.NORTH, springLayout);
+        layout.putConstraint(SpringLayout.NORTH, nameInput, 53, SpringLayout.NORTH, springLayout);
+        layout.putConstraint(SpringLayout.WEST , nameInput, 62, SpringLayout.EAST , nameLabel);
+
+
+        layout.putConstraint(SpringLayout.WEST , passLabel, 10, SpringLayout.WEST , springLayout);
+        layout.putConstraint(SpringLayout.NORTH, passLabel, 84, SpringLayout.NORTH, springLayout);
+        layout.putConstraint(SpringLayout.NORTH, passInput, 78, SpringLayout.NORTH, springLayout);
+        layout.putConstraint(SpringLayout.WEST , passInput, 40, SpringLayout.EAST , passLabel);
+
+        layout.putConstraint(SpringLayout.WEST , genderLabel, 10, SpringLayout.WEST , springLayout);
+        layout.putConstraint(SpringLayout.NORTH, genderLabel, 118, SpringLayout.NORTH, springLayout);
+        layout.putConstraint(SpringLayout.NORTH, radioMale, 116, SpringLayout.NORTH, springLayout);
+        layout.putConstraint(SpringLayout.WEST , radioMale, 30, SpringLayout.EAST , genderLabel);
+        layout.putConstraint(SpringLayout.NORTH, radioFemale, 116, SpringLayout.NORTH, springLayout);
+        layout.putConstraint(SpringLayout.WEST , radioFemale, 90, SpringLayout.EAST , genderLabel);
+
+        layout.putConstraint(SpringLayout.NORTH, savePersonalDataChangesButton, 160, SpringLayout.NORTH, springLayout);
+
+        springLayout.add(savePersonalDataChangesButton);
+        springLayout.add(nameLabel);
+        springLayout.add(nameInput);
+        springLayout.add(passLabel);
+        springLayout.add(passInput);
+        springLayout.add(genderLabel);
+        springLayout.add(radioMale);
+        springLayout.add(radioFemale);
+        springLayout.add(loginLabel);
+        springLayout.add(loginText);
+
+        personalPanel.add(springLayout, BorderLayout.CENTER);
+
+
+        return personalPanel;
+    }
+
     public JPanel getGeneralMessagePanel(){
 
         generalMessagePanel = new JPanel(new BorderLayout());
@@ -394,6 +563,9 @@ public class ClientGUI extends JFrame implements ActionListener{
         logoutButton = new JButton("выйти");
         logoutButton.addActionListener(this);
 
+        getPersonalDataPanelButton = new JButton("личный кабинет");
+        getPersonalDataPanelButton.addActionListener(this);
+
 
         JPanel chooseTypeMessagePanel = new JPanel(new GridLayout(1, 2, 28, 0));
         chooseTypeMessagePanel.add(getGMPanelButton);
@@ -406,6 +578,7 @@ public class ClientGUI extends JFrame implements ActionListener{
 
 
         JPanel logoutPanel = new JPanel(new GridLayout(1, 2, 5, 0));
+        logoutPanel.add(getPersonalDataPanelButton);
         logoutPanel.add(logoutButton);
 
         JPanel flowRight = new JPanel(new FlowLayout(FlowLayout.RIGHT));
@@ -445,6 +618,9 @@ public class ClientGUI extends JFrame implements ActionListener{
         logoutButton = new JButton("выйти");
         logoutButton.addActionListener(this);
 
+        getPersonalDataPanelButton = new JButton("личный кабинет");
+        getPersonalDataPanelButton.addActionListener(this);
+
 
         JPanel chooseTypeMessagePanel = new JPanel(new GridLayout(1, 2, 28, 0));
         chooseTypeMessagePanel.add(getGMPanelButton);
@@ -457,6 +633,7 @@ public class ClientGUI extends JFrame implements ActionListener{
 
 
         JPanel logoutPanel = new JPanel(new GridLayout(1, 2, 5, 0));
+        logoutPanel.add(getPersonalDataPanelButton);
         logoutPanel.add(logoutButton);
 
         JPanel flowRight = new JPanel(new FlowLayout(FlowLayout.RIGHT));
@@ -503,6 +680,9 @@ public class ClientGUI extends JFrame implements ActionListener{
         logoutButton = new JButton("выйти");
         logoutButton.addActionListener(this);
 
+        getPersonalDataPanelButton = new JButton("личный кабинет");
+        getPersonalDataPanelButton.addActionListener(this);
+
 
         JPanel chooseTypeMessagePanel = new JPanel(new GridLayout(1, 2, 28, 0));
         chooseTypeMessagePanel.add(getGMPanelButton);
@@ -515,6 +695,7 @@ public class ClientGUI extends JFrame implements ActionListener{
 
 
         JPanel logoutPanel = new JPanel(new GridLayout(1, 2, 5, 0));
+        logoutPanel.add(getPersonalDataPanelButton);
         logoutPanel.add(logoutButton);
 
         JPanel flowRight = new JPanel(new FlowLayout(FlowLayout.RIGHT));
@@ -678,6 +859,16 @@ public class ClientGUI extends JFrame implements ActionListener{
         if (dialogsPanel != null){
             dialogsPanel.add(activeUsersScrollPanel, BorderLayout.WEST);
         }
+
+    }
+
+    public void setDataAfterLogin(String name, String gender) {
+        this.name = name;
+        this.gender = gender;
+
+        generalMessages = new ArrayList<>();
+        privateMessages = new ArrayList<>();
+        privateDialogs = new JList<>();
 
     }
 

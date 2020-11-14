@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 public interface ChatServer extends Remote {
-    void connect(Map<String, String> details, char[] password) throws RemoteException;
+    void connectNewUser(Map<String, String> details, char[] password) throws RemoteException;
     void disconnect(ChatClient chatClient) throws RemoteException;
     void setPrivateMessage(String addressee, String sender, String message) throws RemoteException;
     void setPrivateMessage(List<String> addressees, String sender, String message) throws RemoteException;
@@ -16,4 +16,6 @@ public interface ChatServer extends Remote {
 
 
     boolean checkLoggingInUser(String login, char[] password) throws RemoteException;
+
+    void changePersonalData(String[] details, char[] pass) throws RemoteException;
 }

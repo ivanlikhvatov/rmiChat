@@ -86,23 +86,29 @@ public class User implements Serializable {
     }
 
 
-    //TODO переписать equals, если он вообще будет нужен
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+
+        if (this == o) {
+            return true;
+        }
+
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
         User user = (User) o;
-        return name.equals(user.name) &&
+
+        return Objects.equals(name, user.name) &&
                 Arrays.equals(password, user.password) &&
-                gender.equals(user.gender) &&
-                hostName.equals(user.hostName) &&
-                clientServiceName.equals(user.clientServiceName) &&
-                client.equals(user.client);
+                Objects.equals(gender, user.gender) &&
+                Objects.equals(hostName, user.hostName) &&
+                Objects.equals(login, user.login);
     }
 
     @Override
     public int hashCode() {
-        int result = Objects.hash(name, gender, hostName, clientServiceName, client);
+        int result = Objects.hash(name, gender, hostName, clientServiceName, client, login);
         result = 31 * result + Arrays.hashCode(password);
         return result;
     }

@@ -1,6 +1,7 @@
 package interfaces;
 
 
+import javax.print.DocFlavor;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.util.List;
@@ -18,9 +19,11 @@ public interface ChatClient extends Remote {
 
     void privateMessageFromServer(Map<String, String> messageDetails, List<String[]> interlocutorsAndLastMessage) throws RemoteException;
 
-    void setGeneralMessages(List<String> messages) throws RemoteException;
+    void privateMessageFromServer(List<String[]> messages, List<String[]> interlocutorsAndLastMessage) throws RemoteException;
 
-    void checkLoggingInUser(String login, char[] password) throws RemoteException;
+    boolean checkLoggingInUser(String login, char[] password) throws RemoteException;
 
     void identificationUser() throws RemoteException;
+
+    void setDataAfterLogin(String name, String gender) throws RemoteException;
 }

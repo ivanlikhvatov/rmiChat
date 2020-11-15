@@ -1,22 +1,22 @@
 package entity;
 
 public class DialogLastMessage {
-    private UserLoginAndName interlocutor;
+    private User interlocutor;
     private String lastMessage;
 
     public DialogLastMessage() {
     }
 
-    public DialogLastMessage(UserLoginAndName interlocutor, String lastMessage) {
+    public DialogLastMessage(User interlocutor, String lastMessage) {
         this.interlocutor = interlocutor;
         this.lastMessage = lastMessage;
     }
 
-    public UserLoginAndName getInterlocutor() {
+    public User getInterlocutor() {
         return interlocutor;
     }
 
-    public void setInterlocutor(UserLoginAndName interlocutor) {
+    public void setInterlocutor(User interlocutor) {
         this.interlocutor = interlocutor;
     }
 
@@ -30,6 +30,14 @@ public class DialogLastMessage {
 
     @Override
     public String toString() {
-        return "<html>" + "<font size='5' style='bold'>" + interlocutor.getUsername() + "</font>" + "<br/>" + lastMessage + "</html>";
+        String g;
+
+        if (interlocutor.getGender().equals("male")){
+            g = "муж";
+        } else {
+            g = "жен";
+        }
+
+        return "<html>" + "<font size='5' style='bold'>" + interlocutor.getUsername() + "</font>" + "  " + "<font size = '3'>" + g + "</font>" + "<br/>" + lastMessage + "</html>";
     }
 }

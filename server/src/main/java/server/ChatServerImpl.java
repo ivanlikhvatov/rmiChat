@@ -138,11 +138,11 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
     }
 
     private void updateUserList(){
-        Map<String, String> namesOfActiveUsers = getUserList();
+        List<String[]> users = getUserList();
 
         for(User user : activeUsers){
             try {
-                user.getClient().updateUserList(namesOfActiveUsers);
+                user.getClient().updateUserList(users);
             }
             catch (RemoteException e) {
                 e.printStackTrace();
@@ -150,14 +150,18 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
         }
     }
 
-    private Map<String, String> getUserList(){
-        Map<String, String> namesOfActiveUsers = new HashMap<>();
+    private List<String[]> getUserList(){
+        List<String[]> users = new ArrayList<>();
 
         for (User user: activeUsers) {
-            namesOfActiveUsers.put(user.getLogin(), user.getName());
+            String[] userDetails = new String[3];
+            userDetails[0] = user.getLogin();
+            userDetails[1] = user.getName();
+            userDetails[2] = user.getGender();
+            users.add(userDetails);
         }
 
-        return namesOfActiveUsers;
+        return users;
     }
 
     @Override
@@ -301,6 +305,8 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                         messageDetails.put("authorLogin", pm.getAuthor().getLogin());
                         messageDetails.put("addresseeName", pm.getAddressee().getName());
                         messageDetails.put("addresseeLogin", pm.getAddressee().getLogin());
+                        messageDetails.put("authorGender", pm.getAuthor().getGender());
+                        messageDetails.put("addresseeGender", pm.getAddressee().getGender());
                         messageDetails.put("message", pm.getMessage());
 
                         try{
@@ -343,12 +349,14 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
 
                         String login = pm.getAuthor().getLogin();
                         String username = pm.getAuthor().getName();
+                        String gender = pm.getAuthor().getGender();
                         String textMessage = pm.getMessage();
 
-                        String[] details = new String[3];
+                        String[] details = new String[4];
                         details[0] = login;
                         details[1] = username;
-                        details[2] = textMessage;
+                        details[2] = gender;
+                        details[3] = textMessage;
 
                         passedUsers.add(login);
                         userPrivateMessages.add(details);
@@ -361,12 +369,15 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
 
                         String login = pm.getAddressee().getLogin();
                         String username = pm.getAddressee().getName();
+                        String gender = pm.getAddressee().getGender();
                         String textMessage = pm.getMessage();
 
-                        String[] details = new String[3];
+
+                        String[] details = new String[4];
                         details[0] = login;
                         details[1] = username;
-                        details[2] = textMessage;
+                        details[2] = gender;
+                        details[3] = textMessage;
 
                         passedUsers.add(login);
                         userPrivateMessages.add(details);
@@ -424,12 +435,14 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
 
                 if (message instanceof PrivateMessage){
                     if (((PrivateMessage) message).getAddressee().getLogin().equals(user.getLogin()) || ((PrivateMessage) message).getAuthor().getLogin().equals(user.getLogin())){
-                        String[] messageDetails = new String[5];
+                        String[] messageDetails = new String[7];
                         messageDetails[0] = ((PrivateMessage) message).getAuthor().getName();
                         messageDetails[1] = ((PrivateMessage) message).getAuthor().getLogin();
-                        messageDetails[2] = ((PrivateMessage) message).getAddressee().getName();
-                        messageDetails[3] = ((PrivateMessage) message).getAddressee().getLogin();
-                        messageDetails[4] = message.getMessage();
+                        messageDetails[2] = ((PrivateMessage) message).getAuthor().getGender();
+                        messageDetails[3] = ((PrivateMessage) message).getAddressee().getName();
+                        messageDetails[4] = ((PrivateMessage) message).getAddressee().getLogin();
+                        messageDetails[5] = ((PrivateMessage) message).getAddressee().getGender();
+                        messageDetails[6] = message.getMessage();
 
                         privateMessages.add(messageDetails);
                     }
@@ -458,12 +471,14 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
 
                         String login = pm.getAuthor().getLogin();
                         String username = pm.getAuthor().getName();
+                        String gender = pm.getAuthor().getGender();
                         String textMessage = pm.getMessage();
 
-                        String[] details = new String[3];
+                        String[] details = new String[4];
                         details[0] = login;
                         details[1] = username;
-                        details[2] = textMessage;
+                        details[2] = gender;
+                        details[3] = textMessage;
 
                         passedUsers.add(login);
                         userPrivateMessages.add(details);
@@ -476,12 +491,14 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
 
                         String login = pm.getAddressee().getLogin();
                         String username = pm.getAddressee().getName();
+                        String gender = pm.getAddressee().getGender();
                         String textMessage = pm.getMessage();
 
-                        String[] details = new String[3];
+                        String[] details = new String[4];
                         details[0] = login;
                         details[1] = username;
-                        details[2] = textMessage;
+                        details[2] = gender;
+                        details[3] = textMessage;
 
                         passedUsers.add(login);
                         userPrivateMessages.add(details);

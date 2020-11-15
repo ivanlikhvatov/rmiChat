@@ -136,7 +136,7 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
     }
 
     @Override
-    public void updateUserList(Map<String, String> activeUsers) {
+    public void updateUserList(List<String[]> activeUsers) {
         clientGUI.updateUserListPanel(activeUsers);
     }
 

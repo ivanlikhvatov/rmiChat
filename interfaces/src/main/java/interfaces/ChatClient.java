@@ -9,7 +9,7 @@ public interface ChatClient extends Remote {
     boolean checkLoggingInUser(String login, char[] password) throws RemoteException;
     void setDataAfterLogin(String name, String gender) throws RemoteException;
     String getClientServiceName() throws RemoteException;
-    void updateUserList(Map<String, String> activeUsers) throws RemoteException;
+    void updateUserList(List<String[]> activeUsers) throws RemoteException;
     void sendPrivateMessage(String addressee, String message) throws RemoteException;
     void sendPrivateMessage(List<String> addressees, String message) throws RemoteException;
     void sendGeneralMessage(String message, String login) throws RemoteException;

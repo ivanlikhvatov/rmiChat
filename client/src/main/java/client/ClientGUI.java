@@ -22,12 +22,12 @@ public class ClientGUI extends JFrame implements ActionListener{
     private char[] pass;
     private String gender;
     private String login;
-    private UserLoginAndName addressee;
+    private User addressee;
     private List<PrivateMessage> privateMessages;
     private List<String> generalMessages;
 
     private Container container = this.getContentPane();
-    private JList<UserLoginAndName> activeUsers;
+    private JList<User> activeUsers;
     private JList<DialogLastMessage> privateDialogs;
     private JPanel inputPanel;
     private JTextField nameInput, messageInput, loginInput;
@@ -208,7 +208,7 @@ public class ClientGUI extends JFrame implements ActionListener{
             if (activeUsers.getSelectedIndices().length > 1){
                 List<String> loginList = new ArrayList<>();
 
-                for (UserLoginAndName user : activeUsers.getSelectedValuesList()){
+                for (User user : activeUsers.getSelectedValuesList()){
                     loginList.add(user.getLogin());
                 }
                 chatClient.sendPrivateMessage(loginList, messageInput.getText());
@@ -632,9 +632,10 @@ public class ClientGUI extends JFrame implements ActionListener{
         for (String[] messageDetails : interlocutorsAndLastMessage){
             String login = messageDetails[0];
             String username = messageDetails[1];
-            String message = messageDetails[2];
+            String gender = messageDetails[2];
+            String message = messageDetails[3];
 
-            UserLoginAndName user = new UserLoginAndName(login, username);
+            User user = new User(login, username, gender);
             tempPrivateMessages.addElement(new DialogLastMessage(user, message));
         }
 
@@ -671,12 +672,12 @@ public class ClientGUI extends JFrame implements ActionListener{
         });
     }
 
-    public void setActiveUsersPanel(Map<String, String> users){
+    public void setActiveUsersPanel(List<String[]> users){
         activeUsersScrollPanel = new JPanel(new BorderLayout());
-        DefaultListModel<UserLoginAndName> tempUsersList = new DefaultListModel<>();
+        DefaultListModel<User> tempUsersList = new DefaultListModel<>();
 
-        for (Map.Entry<String, String> entry : users.entrySet()) {
-            tempUsersList.addElement(new UserLoginAndName(entry.getKey(), entry.getValue()));
+        for (String[] userDetails : users){
+            tempUsersList.addElement(new User(userDetails[0], userDetails[1], userDetails[2]));
         }
 
         activeUsers = new JList<>(tempUsersList);
@@ -737,7 +738,7 @@ public class ClientGUI extends JFrame implements ActionListener{
         }
     }
 
-    public void updateUserListPanel(Map<String, String> activeUsers) {
+    public void updateUserListPanel(List<String[]> activeUsers) {
         if (generalMessagePanel != null){
             generalMessagePanel.remove(activeUsersScrollPanel);
         }
@@ -766,8 +767,8 @@ public class ClientGUI extends JFrame implements ActionListener{
 
     public void updatePrivateMessages(Map<String, String> messageDetails, List<String[]> interlocutorsAndLastMessage) {
         PrivateMessage pm = new PrivateMessage();
-        pm.setAddressee(new UserLoginAndName(messageDetails.get("addresseeLogin"), messageDetails.get("addresseeName")));
-        pm.setSender(new UserLoginAndName(messageDetails.get("authorLogin"), messageDetails.get("authorName")));
+        pm.setAddressee(new User(messageDetails.get("addresseeLogin"), messageDetails.get("addresseeName"), messageDetails.get("addresseeGender")));
+        pm.setSender(new User(messageDetails.get("authorLogin"), messageDetails.get("authorName"), messageDetails.get("authorGender")));
         pm.setText(messageDetails.get("message"));
 
         if (dialogsPanel != null){
@@ -794,9 +795,9 @@ public class ClientGUI extends JFrame implements ActionListener{
     public void updatePrivateMessages(List<String[]> messages, List<String[]> interlocutorsAndLastMessage){
         for (String[] messageDetails: messages) {
             PrivateMessage pm = new PrivateMessage();
-            pm.setAddressee(new UserLoginAndName(messageDetails[3], messageDetails[2]));
-            pm.setSender(new UserLoginAndName(messageDetails[1], messageDetails[0]));
-            pm.setText(messageDetails[4]);
+            pm.setSender(new User(messageDetails[1], messageDetails[0], messageDetails[2]));
+            pm.setAddressee(new User(messageDetails[4], messageDetails[3], messageDetails[5]));
+            pm.setText(messageDetails[6]);
             privateMessages.add(pm);
 
             if (privateTextArea != null){

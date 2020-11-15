@@ -1,32 +1,32 @@
 package entity;
 
 public class PrivateMessage {
-    private UserLoginAndName sender;
-    private UserLoginAndName addressee;
+    private User sender;
+    private User addressee;
     private String text;
 
     public PrivateMessage() {
     }
 
-    public PrivateMessage(UserLoginAndName sender, UserLoginAndName addressee, String text) {
+    public PrivateMessage(User sender, User addressee, String text) {
         this.sender = sender;
         this.addressee = addressee;
         this.text = text;
     }
 
-    public UserLoginAndName getSender() {
+    public User getSender() {
         return sender;
     }
 
-    public void setSender(UserLoginAndName sender) {
+    public void setSender(User sender) {
         this.sender = sender;
     }
 
-    public UserLoginAndName getAddressee() {
+    public User getAddressee() {
         return addressee;
     }
 
-    public void setAddressee(UserLoginAndName addressee) {
+    public void setAddressee(User addressee) {
         this.addressee = addressee;
     }
 

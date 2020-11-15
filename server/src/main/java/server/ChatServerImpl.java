@@ -1,12 +1,10 @@
 package server;
-
 import entity.GeneralMessage;
 import entity.Message;
 import entity.PrivateMessage;
 import entity.User;
 import interfaces.ChatClient;
 import interfaces.ChatServer;
-
 import java.net.MalformedURLException;
 import java.rmi.*;
 import java.rmi.server.UnicastRemoteObject;
@@ -14,13 +12,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
-
-    public static final String UNIC_BINDING_NAME = "server";
-    public static final String HOST_NAME = "localhost";
-    private static final int MAX_COUNT_THREADS_FOR_NEW_MESSAGE = 900;
-    private static final int MAX_COUNT_THREADS_FOR_OLD_MESSAGE = 100;
-    private static final String CHARACTER_FOR_LOGIN = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefhhijklmnopqrstuvwxyz";
-
     private List<User> activeUsers;
     private List<User> allUsers;
     private Queue<User> connectingUsers;
@@ -28,6 +19,11 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
     private Queue<Message> messagesToSend;
     private List<Thread> newMessageSenders;
     private List<Thread> oldMessageSenders;
+    public static final String UNIC_BINDING_NAME = "server";
+    public static final String HOST_NAME = "localhost";
+    private static final int MAX_COUNT_THREADS_FOR_NEW_MESSAGE = 900;
+    private static final int MAX_COUNT_THREADS_FOR_OLD_MESSAGE = 100;
+    private static final String CHARACTER_FOR_LOGIN = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefhhijklmnopqrstuvwxyz";
 
     public ChatServerImpl() throws RemoteException {
         super();
@@ -38,7 +34,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
         connectingUsers = new ConcurrentLinkedQueue<>();
         newMessageSenders = Collections.synchronizedList(new ArrayList<>());
         oldMessageSenders = Collections.synchronizedList(new ArrayList<>());
-
     }
 
     @Override
@@ -58,32 +53,22 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
             allUsers.add(user);
             activeUsers.add(user);
             updateUserList();
-
             connectingUsers.add(user);
             createOldMessageSender();
-        }
-
-
-        catch(RemoteException | MalformedURLException | NotBoundException e){
+        } catch(RemoteException | MalformedURLException | NotBoundException e){
             e.printStackTrace();
         }
-
-
     }
 
     public void connectOldUser(User user){
-
         try{
             ChatClient nextClient = (ChatClient)Naming.lookup("rmi://" + user.getHostName() + "/" + user.getClientServiceName());
             nextClient.setDataAfterLogin(user.getName(), user.getGender());
-
             user.setClient(nextClient);
             activeUsers.add(user);
             updateUserList();
-
             connectingUsers.add(user);
             createOldMessageSender();
-
         } catch(RemoteException | MalformedURLException | NotBoundException e){
             e.printStackTrace();
         }
@@ -91,22 +76,52 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
     }
 
     @Override
-    public boolean checkLoggingInUser(String login, char[] password) throws RemoteException{
+    public void disconnect(ChatClient chatClient){
+        Iterator<User> iter = activeUsers.iterator();
+
+        while (iter.hasNext()) {
+            User user = iter.next();
+
+            try{
+                if (user.getClientServiceName().equals(chatClient.getClientServiceName())){
+                    iter.remove();
+                }
+            } catch (RemoteException e){
+                e.printStackTrace();
+            }
+        }
+
+        try{
+            Naming.unbind("rmi://" + HOST_NAME + "/" + chatClient.getClientServiceName());
+        } catch (NotBoundException | MalformedURLException | RemoteException e){
+            e.printStackTrace();
+        }
+
+        if(!activeUsers.isEmpty()){
+            updateUserList();
+        }
+    }
+
+    @Override
+    public boolean checkLoggingInUser(String login, char[] password){
         for (User oldUser: allUsers) {
             if (oldUser.getLogin().equals(login) && Arrays.equals(oldUser.getPassword(), password)){
-
                 connectOldUser(oldUser);
-
                 return true;
-
             }
+        }
+
+        try{
+            Naming.unbind("rmi://" + HOST_NAME + "/" + "Client_" + login);
+        } catch (NotBoundException | MalformedURLException | RemoteException e){
+            e.printStackTrace();
         }
 
         return false;
     }
 
     @Override
-    public void changePersonalData(String[] details, char[] pass) throws RemoteException {
+    public void changePersonalData(String[] details, char[] pass) {
         String login = details[0];
         String name = details[1];
         String gender = details[2];
@@ -120,10 +135,7 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
         }
 
         updateUserList();
-
-
     }
-
 
     private void updateUserList(){
         Map<String, String> namesOfActiveUsers = getUserList();
@@ -136,9 +148,7 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                 e.printStackTrace();
             }
         }
-
     }
-
 
     private Map<String, String> getUserList(){
         Map<String, String> namesOfActiveUsers = new HashMap<>();
@@ -151,31 +161,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
     }
 
     @Override
-    public void disconnect(ChatClient chatClient) throws RemoteException {
-
-        Iterator<User> iter = activeUsers.iterator();
-
-        while (iter.hasNext()) {
-            User user = iter.next();
-
-            if (user.getClientServiceName().equals(chatClient.getClientServiceName()))
-                iter.remove();
-        }
-
-
-
-
-        if(!activeUsers.isEmpty()){
-            updateUserList();
-        }
-
-
-    }
-
-
-
-
-    @Override
     public void setGeneralMessage(String message, String login) {
         User user = findActiveByLogin(login);
 
@@ -183,22 +168,14 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
             return;
         }
 
-
-
         //TODO проверить на цензуру сообщения, если не проходит бан или предупреждение
         String messageFromServer =  "[" +user.getName() + "]" + " : " + message + "\n";
-
         GeneralMessage gm = new GeneralMessage();
         gm.setText(messageFromServer);
         gm.setAuthor(user);
-
         allMessages.add(gm);
         messagesToSend.add(gm);
-
         createNewMessageSender();
-
-
-
     }
 
     @Override
@@ -217,22 +194,17 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
 
         //TODO проверить на цензуру сообщения, если не проходит бан или предупреждение
         String messageFromServer =  "[" +sender.getName() + "]" + " : " + message + "\n";
-
         PrivateMessage pm = new PrivateMessage();
         pm.setAddressee(addressee);
         pm.setAuthor(sender);
         pm.setMessage(messageFromServer);
-
         allMessages.add(pm);
         messagesToSend.add(pm);
-
         createNewMessageSender();
     }
 
     @Override
     public void setPrivateMessage(List<String> addresseesLoginList, String senderLogin, String message){
-
-
         User sender = findActiveByLogin(senderLogin);
 
         if (sender == null){
@@ -253,17 +225,13 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
             pm.setAuthor(sender);
             pm.setAddressee(addressee);
             pm.setMessage(messageFromServer);
-
             allMessages.add(pm);
             messagesToSend.add(pm);
             createNewMessageSender();
         }
-
-
     }
 
     private void createNewMessageSender(){
-
         int currentCountThreads = newMessageSenders.size();
 
         if (currentCountThreads >= MAX_COUNT_THREADS_FOR_NEW_MESSAGE){
@@ -276,7 +244,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
     }
 
     private void createOldMessageSender(){
-
         int currentCountThreads = oldMessageSenders.size();
 
         if (currentCountThreads >= MAX_COUNT_THREADS_FOR_OLD_MESSAGE){
@@ -309,16 +276,13 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
     }
 
     class NewMessageSender implements Runnable{
-
         @Override
         public void run() {
             Message message;
 
             while (messagesToSend.size() > 0) {
-
                 if ((message = messagesToSend.poll()) != null){
-
-                    if (message.getClass().equals(PrivateMessage.class)){
+                    if (message instanceof PrivateMessage){
                         PrivateMessage pm = (PrivateMessage) message;
 
                         ChatClient addresseeClient = null;
@@ -340,7 +304,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                         messageDetails.put("message", pm.getMessage());
 
                         try{
-
                             if (authorClient != null){
                                 authorClient.privateMessageFromServer(messageDetails, findPrivateMessageByUserLogin(pm.getAuthor().getLogin()));
                             }
@@ -348,45 +311,32 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                             if (addresseeClient != null){
                                 addresseeClient.privateMessageFromServer(messageDetails, findPrivateMessageByUserLogin(pm.getAddressee().getLogin()));
                             }
-
                         } catch (RemoteException e) {
                             e.printStackTrace();
                         }
-
                     }
 
-
-                    if (message.getClass().equals(GeneralMessage.class)){
+                    if (message instanceof GeneralMessage){
                         GeneralMessage gm = (GeneralMessage) message;
                         sendToAll(gm.getText());
-
                     }
-
                 }
-
             }
-
 
             if (!newMessageSenders.isEmpty()){
                 newMessageSenders.remove(this);
             }
-
-
-
         }
 
         private List<String[]> findPrivateMessageByUserLogin(String userLogin){
-
             List<String[]> userPrivateMessages = new ArrayList<>();
             List<String> passedUsers = new ArrayList<>();
 
             for (int i = allMessages.size() - 1; i >= 0; i--) {
-                if (allMessages.get(i).getClass().equals(PrivateMessage.class)){
-
+                if (allMessages.get(i) instanceof PrivateMessage){
                     PrivateMessage pm = (PrivateMessage) allMessages.get(i);
 
                     if (pm.getAddressee().getLogin().equals(userLogin)){
-
                         if (passedUsers.contains(pm.getAuthor().getLogin())){
                             continue;
                         }
@@ -400,15 +350,11 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                         details[1] = username;
                         details[2] = textMessage;
 
-
                         passedUsers.add(login);
                         userPrivateMessages.add(details);
-
-
                     }
 
                     if (pm.getAuthor().getLogin().equals(userLogin)){
-
                         if (passedUsers.contains(pm.getAddressee().getLogin())){
                             continue;
                         }
@@ -425,12 +371,8 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                         passedUsers.add(login);
                         userPrivateMessages.add(details);
                     }
-
-
-
                 }
             }
-
             return userPrivateMessages;
         }
 
@@ -445,11 +387,9 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                 }
             }
         }
-
     }
 
     class OldMessageSender implements Runnable{
-
         @Override
         public void run() {
             User user;
@@ -471,7 +411,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
         }
 
         private void setAllMessages(User user){
-
             List<String[]> privateMessages = new ArrayList<>();
 
             for (Message message : allMessages) {
@@ -484,10 +423,7 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                 }
 
                 if (message instanceof PrivateMessage){
-
                     if (((PrivateMessage) message).getAddressee().getLogin().equals(user.getLogin()) || ((PrivateMessage) message).getAuthor().getLogin().equals(user.getLogin())){
-
-
                         String[] messageDetails = new String[5];
                         messageDetails[0] = ((PrivateMessage) message).getAuthor().getName();
                         messageDetails[1] = ((PrivateMessage) message).getAuthor().getLogin();
@@ -496,7 +432,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                         messageDetails[4] = message.getMessage();
 
                         privateMessages.add(messageDetails);
-
                     }
                 }
             }
@@ -506,21 +441,17 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
             } catch (RemoteException e) {
                 e.printStackTrace();
             }
-
         }
 
         private List<String[]> findPrivateMessageByUserLogin(String userLogin){
-
             List<String[]> userPrivateMessages = new ArrayList<>();
             List<String> passedUsers = new ArrayList<>();
 
             for (int i = allMessages.size() - 1; i >= 0; i--) {
                 if (allMessages.get(i).getClass().equals(PrivateMessage.class)){
-
                     PrivateMessage pm = (PrivateMessage) allMessages.get(i);
 
                     if (pm.getAddressee().getLogin().equals(userLogin)){
-
                         if (passedUsers.contains(pm.getAuthor().getLogin())){
                             continue;
                         }
@@ -534,15 +465,11 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                         details[1] = username;
                         details[2] = textMessage;
 
-
                         passedUsers.add(login);
                         userPrivateMessages.add(details);
-
-
                     }
 
                     if (pm.getAuthor().getLogin().equals(userLogin)){
-
                         if (passedUsers.contains(pm.getAddressee().getLogin())){
                             continue;
                         }
@@ -559,23 +486,14 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                         passedUsers.add(login);
                         userPrivateMessages.add(details);
                     }
-
-
-
                 }
             }
-
             return userPrivateMessages;
         }
-
-
     }
 
-
     public static void main (String[] args) throws RemoteException, MalformedURLException {
-
         java.rmi.registry.LocateRegistry.createRegistry(1099);
-
         String hostName = HOST_NAME;
         String serviceName = UNIC_BINDING_NAME;
 
@@ -584,12 +502,9 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
             serviceName = args[1];
         }
 
-
         ChatServer hello = new ChatServerImpl();
         Naming.rebind("rmi://" + hostName + "/" + serviceName, hello);
-
     }
-
 }
 
 

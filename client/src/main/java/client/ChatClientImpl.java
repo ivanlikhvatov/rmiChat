@@ -1,11 +1,8 @@
 package client;
 
-
-
 import interfaces.ChatClient;
 import interfaces.ChatServer;
 
-import javax.swing.*;
 import java.net.MalformedURLException;
 import java.rmi.ConnectException;
 import java.rmi.Naming;
@@ -16,21 +13,16 @@ import java.security.SecureRandom;
 import java.util.*;
 
 public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
-
-    public static final String UNIC_BINDING_NAME = "server";
-
-    private String hostName = "localhost";
     private ClientGUI clientGUI;
     private String username;
     private String gender;
     private char[] password;
     private String login;
-
-
-    private String serviceName = "server";
     private String clientServiceName;
-    protected ChatServer chatServer;
+    private ChatServer chatServer;
 
+    private static final String HOST_NAME = "localhost";
+    private static final String UNIC_BINDING_NAME = "server";
     private static final String CHARACTER_FOR_LOGIN = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefhhijklmnopqrstuvwxyz";
 
     public ChatClientImpl(ClientGUI clientGUI, String username, String gender, char[] password) throws RemoteException {
@@ -40,11 +32,7 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         this.gender = gender;
         this.password = password;
         this.login = generateRandomLogin();
-
-        clientGUI.login = this.login;//TODO
-
-        System.out.println(login);
-
+        clientGUI.setLogin(this.login);
     }
 
     public ChatClientImpl(ClientGUI clientGUI, String login, char[] password) throws RemoteException {
@@ -54,44 +42,37 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         this.login = login;
     }
 
-
-
-
     @Override
-    public void identificationUser() throws RemoteException{
+    public void identificationUser(){
         clientServiceName = "Client_" + login;
-
         Map<String, String> details = new HashMap<>();
         details.put("username", username);
         details.put("gender", gender);
         details.put("clientServiceName", clientServiceName);
-        details.put("hostName", hostName);
+        details.put("hostName", HOST_NAME);
         details.put("login", login);
 
-
-
         try {
-
-            Naming.rebind("rmi://" + hostName + "/" + clientServiceName, this);
+            Naming.rebind("rmi://" + HOST_NAME + "/" + clientServiceName, this);
             chatServer = (ChatServer) Naming.lookup(UNIC_BINDING_NAME);
-
         }
         catch (ConnectException  e) {
-            JOptionPane.showMessageDialog(
-                    clientGUI.frame, "The server seems to be unavailable\nPlease try later",
-                    "Connection problem", JOptionPane.ERROR_MESSAGE);
+            clientGUI.generateErrorMessage("Сервер не найден\nПопробуйте позже", "Проблема подключения");
             e.printStackTrace();
         }
         catch(NotBoundException | MalformedURLException me){
+            clientGUI.generateErrorMessage("Не удается подключиться к серверу", "Проблема подключения");
             me.printStackTrace();
         }
+        catch (RemoteException re){
+            clientGUI.generateErrorMessage("Неккоректный пользователь", "Проблема подключения");
+            re.printStackTrace();
+        }
 
-        clientGUI.generalMessages = new ArrayList<>();
-        clientGUI.privateMessages = new ArrayList<>();
-        clientGUI.privateDialogs = new JList<>();
-
+        clientGUI.assignGeneralMessages();
+        clientGUI.assignPrivateMessages();
+        clientGUI.assignPrivateDialogs();
         registerWithServer(details, password);
-        System.out.println("Client Listen RMI Server is running...\n");
     }
 
     @Override
@@ -102,28 +83,44 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         clientGUI.setDataAfterLogin(name, gender);
     }
 
-
     @Override
-    public boolean checkLoggingInUser(String login, char[] password) throws RemoteException{
+    public boolean checkLoggingInUser(String login, char[] password){
         try {
             clientServiceName = "Client_" + login;
+            List<String> users = Arrays.asList(Naming.list(UNIC_BINDING_NAME));
 
-            Naming.rebind("rmi://" + hostName + "/" + clientServiceName, this);
+            if (users.contains("//:1099/" + clientServiceName)){
+                clientGUI.generateErrorMessage("Ваш клиент уже запущен", "Проблемы с подключением");
+                return false;
+            }
+
+            Naming.rebind("rmi://" + HOST_NAME + "/" + clientServiceName, this);
             chatServer = (ChatServer) Naming.lookup(UNIC_BINDING_NAME);
 
-            return chatServer.checkLoggingInUser(login, password);
+            if (!chatServer.checkLoggingInUser(login, password)){
+                clientGUI.generateErrorMessage("Пользователя с таким паролем\nи/или логином не существует", "Проблемы с подключением");
+                return false;
+            }
+
+            return true;
 
         }
-        catch (ConnectException  e) {
-            JOptionPane.showMessageDialog(
-                    clientGUI.frame, "The server seems to be unavailable\nPlease try later",
-                    "Connection problem", JOptionPane.ERROR_MESSAGE);
-            e.printStackTrace();
+        catch (ConnectException ce) {
+            clientGUI.generateErrorMessage("Проблемы на сервере\nПопробуйте позже", "Проблемы с подключением");
+            ce.printStackTrace();
         }
-        catch(NotBoundException | MalformedURLException me){
+        catch(NotBoundException nb){
+            clientGUI.generateErrorMessage("Сервер с таким названием\n не существует", "Проблемы с подключением");
+            nb.printStackTrace();
+        }
+        catch (MalformedURLException me){
+            clientGUI.generateErrorMessage("URL-порт не действителен", "Проблемы с подключением");
             me.printStackTrace();
         }
-
+        catch (RemoteException re){
+            clientGUI.generateErrorMessage("Неккоретный пользователь", "Проблемы с подключением");
+            re.printStackTrace();
+        }
 
         return false;
     }
@@ -133,98 +130,41 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
             chatServer.connectNewUser(details, password);
         }
         catch(Exception e){
+            clientGUI.generateErrorMessage("Не удалось зарегистрироваться,\nпопробуйте позже", "ошибка регистрации");
             e.printStackTrace();
         }
     }
 
     @Override
     public void updateUserList(Map<String, String> activeUsers) {
-
-        if (clientGUI.generalMessagePanel != null){
-            clientGUI.generalMessagePanel.remove(clientGUI.activeUsersScrollPanel);
-        }
-
-        clientGUI.setActiveUsersPanel(activeUsers);
-        clientGUI.activeUsersScrollPanel.repaint();
-        clientGUI.activeUsersScrollPanel.revalidate();
+        clientGUI.updateUserListPanel(activeUsers);
     }
 
     @Override
-    public void sendGeneralMessage(String message, String login) throws RemoteException {
-        chatServer.setGeneralMessage(message, login);
+    public void sendGeneralMessage(String message, String login){
+        try{
+            chatServer.setGeneralMessage(message, login);
+        }
+        catch (RemoteException re){
+            clientGUI.generateErrorMessage("Ваше сообщение не было отправлено", "Ошибка отправки");
+            re.printStackTrace();
+        }
     }
 
     @Override
     public void generalMessageFromServer(String message){
-
-        clientGUI.generalMessages.add(message);
-
-        if (clientGUI.generalTextArea != null) {
-            clientGUI.generalTextArea.append(message);
-            clientGUI.generalTextArea.setCaretPosition(clientGUI.generalTextArea.getDocument().getLength());
-        }
-
-        if (clientGUI.messageInput != null){
-            clientGUI.messageInput.setText("");
-        }
-
+        clientGUI.updateGeneralMessages(message);
     }
 
     @Override
-    public void privateMessageFromServer(Map<String, String> messageDetails, List<String[]> interlocutorsAndLastMessage) {
-        PrivateMessage pm = new PrivateMessage();
-
-        pm.setAddressee(new UserLoginAndName(messageDetails.get("addresseeLogin"), messageDetails.get("addresseeName")));
-        pm.setSender(new UserLoginAndName(messageDetails.get("authorLogin"), messageDetails.get("authorName")));
-        pm.setText(messageDetails.get("message"));
-
-        if (clientGUI.dialogsPanel != null){
-            clientGUI.dialogsPanel.remove(clientGUI.pmDialogsScrollPanel);
-        }
-
-
-
-        clientGUI.setPrivateDialogsPanel(interlocutorsAndLastMessage);
-
-        clientGUI.pmDialogsScrollPanel.repaint();
-        clientGUI.pmDialogsScrollPanel.revalidate();
-
-
-        clientGUI.privateMessages.add(pm);
-
-        if (messageDetails.get("authorLogin").equals(this.login)){
-            if (clientGUI.messageInput != null){
-                clientGUI.messageInput.setText("");
-            }
-        }
-
-        if (clientGUI.privateTextArea != null){
-            clientGUI.privateTextArea.append(messageDetails.get("message"));
-            clientGUI.privateTextArea.setCaretPosition(clientGUI.privateTextArea.getDocument().getLength());
-        }
-
-
+    public void privateMessageFromServer(Map<String, String> messageDetails, List<String[]> interlocutorsAndLastMessage){
+        clientGUI.updatePrivateMessages(messageDetails, interlocutorsAndLastMessage);
     }
 
     @Override
-    public void privateMessageFromServer(List<String[]> messages, List<String[]> interlocutorsAndLastMessage) throws RemoteException {
-
-        for (String[] messageDetails: messages) {
-            PrivateMessage pm = new PrivateMessage();
-
-            pm.setAddressee(new UserLoginAndName(messageDetails[3], messageDetails[2]));
-            pm.setSender(new UserLoginAndName(messageDetails[1], messageDetails[0]));
-            pm.setText(messageDetails[4]);
-            clientGUI.privateMessages.add(pm);
-        }
-
-
-        clientGUI.setPrivateDialogsPanel(interlocutorsAndLastMessage);
-
-
+    public void privateMessageFromServer(List<String[]> messages, List<String[]> interlocutorsAndLastMessage){
+        clientGUI.updatePrivateMessages(messages, interlocutorsAndLastMessage);
     }
-
-
 
     @Override
     public String getClientServiceName() {
@@ -232,13 +172,27 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
     }
 
     @Override
-    public void sendPrivateMessage(String addressee, String message) throws RemoteException {
-        chatServer.setPrivateMessage(addressee, login, message);
+    public void sendPrivateMessage(String addressee, String message){
+        try{
+            chatServer.setPrivateMessage(addressee, login, message);
+        }
+        catch (RemoteException re){
+            clientGUI.generateErrorMessage("Ваше сообщение не было отправлено", "Ошибка отправки");
+            re.printStackTrace();
+        }
+
     }
 
     @Override
-    public void sendPrivateMessage(List<String> addressees, String message) throws RemoteException {
-        chatServer.setPrivateMessage(addressees, login, message);
+    public void sendPrivateMessage(List<String> addressees, String message){
+        try {
+            chatServer.setPrivateMessage(addressees, login, message);
+        }
+        catch (RemoteException re){
+            clientGUI.generateErrorMessage("Ваши сообщения не были отправлены", "Ошибка отправки");
+            re.printStackTrace();
+        }
+
     }
 
     public String generateRandomLogin() {
@@ -250,58 +204,6 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         }
 
         return sb.toString();
-    }
-
-    public String getHostName() {
-        return hostName;
-    }
-
-    public void setHostName(String hostName) {
-        this.hostName = hostName;
-    }
-
-    public ClientGUI getClientGUI() {
-        return clientGUI;
-    }
-
-    public void setClientGUI(ClientGUI clientGUI) {
-        this.clientGUI = clientGUI;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public String getGender() {
-        return gender;
-    }
-
-    public void setGender(String gender) {
-        this.gender = gender;
-    }
-
-    public char[] getPassword() {
-        return password;
-    }
-
-    public void setPassword(char[] password) {
-        this.password = password;
-    }
-
-    public String getServiceName() {
-        return serviceName;
-    }
-
-    public void setServiceName(String serviceName) {
-        this.serviceName = serviceName;
-    }
-
-    public void setClientServiceName(String clientServiceName) {
-        this.clientServiceName = clientServiceName;
     }
 
     public void changePersonalData(String name, String gender, char[] pass) {
@@ -322,123 +224,12 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
 
     }
 
-    static class UserLoginAndName {
-        private String login;
-        private String username;
-
-        public UserLoginAndName(String login, String username) {
-            this.login = login;
-            this.username = username;
+    public void disconnect(ChatClientImpl chatClient) {
+        try{
+            chatServer.disconnect(chatClient);
+        } catch (RemoteException e) {
+            clientGUI.generateErrorMessage("Проблемы с отключением от сервера", "Ошибка закрытия приложения");
+            e.printStackTrace();
         }
-
-        public String getLogin() {
-            return login;
-        }
-
-        public void setLogin(String login) {
-            this.login = login;
-        }
-
-        public String getUsername() {
-            return username;
-        }
-
-        public void setUsername(String username) {
-            this.username = username;
-        }
-
-        @Override
-        public String toString() {
-            return username;
-        }
-    }
-
-    static class PrivateMessage{
-        private UserLoginAndName sender;
-        private UserLoginAndName addressee;
-        private String text;
-
-        public PrivateMessage() {
-        }
-
-        public PrivateMessage(UserLoginAndName sender, UserLoginAndName addressee, String text) {
-            this.sender = sender;
-            this.addressee = addressee;
-            this.text = text;
-        }
-
-        public UserLoginAndName getSender() {
-            return sender;
-        }
-
-        public void setSender(UserLoginAndName sender) {
-            this.sender = sender;
-        }
-
-        public UserLoginAndName getAddressee() {
-            return addressee;
-        }
-
-        public void setAddressee(UserLoginAndName addressee) {
-            this.addressee = addressee;
-        }
-
-        public String getText() {
-            return text;
-        }
-
-        public void setText(String text) {
-            this.text = text;
-        }
-    }
-
-    static class DialogLastMessage{
-        private UserLoginAndName interlocutor;
-        private String lastMessage;
-
-        public DialogLastMessage() {
-        }
-
-        public DialogLastMessage(UserLoginAndName interlocutor, String lastMessage) {
-            this.interlocutor = interlocutor;
-            this.lastMessage = lastMessage;
-        }
-
-        public UserLoginAndName getInterlocutor() {
-            return interlocutor;
-        }
-
-        public void setInterlocutor(UserLoginAndName interlocutor) {
-            this.interlocutor = interlocutor;
-        }
-
-        public String getLastMessage() {
-            return lastMessage;
-        }
-
-        public void setLastMessage(String lastMessage) {
-            this.lastMessage = lastMessage;
-        }
-
-        @Override
-        public String toString() {
-            return "<html>" + "<font size='5' style='bold'>" + interlocutor.getUsername() + "</font>" + "<br/>" + lastMessage + "</html>";
-        }
-    }
-
-
-    @Override
-    public String toString() {
-        return "ChatClientImpl{" +
-                "hostName='" + hostName + '\'' +
-                ", clientGUI=" + clientGUI +
-                ", username='" + username + '\'' +
-                ", gender='" + gender + '\'' +
-                ", password=" + Arrays.toString(password) +
-                ", login='" + login + '\'' +
-                ", serviceName='" + serviceName + '\'' +
-                ", clientServiceName='" + clientServiceName + '\'' +
-                ", chatServer=" + chatServer +
-                '}';
     }
 }

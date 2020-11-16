@@ -522,7 +522,7 @@ public class ClientGUI extends JFrame implements ActionListener{
 
         if (privateDialogs.getModel().getSize() == 0){
             List<String[]> emptyDialogs = new ArrayList<>();
-            emptyDialogs.add(new String[]{"nothing", "У вас нет сообщений", ""});
+            emptyDialogs.add(new String[]{"nothing", "У вас нет сообщений", "", ""});
             setPrivateDialogsPanel(emptyDialogs);
         }
 

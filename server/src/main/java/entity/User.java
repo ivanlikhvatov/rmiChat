@@ -112,4 +112,16 @@ public class User implements Serializable {
         result = 31 * result + Arrays.hashCode(password);
         return result;
     }
+
+    @Override
+    public String toString() {
+        return "User{" +
+                "name='" + name + '\'' +
+                ", password=" + Arrays.toString(password) +
+                ", gender='" + gender + '\'' +
+                ", hostName='" + hostName + '\'' +
+                ", clientServiceName='" + clientServiceName + '\'' +
+                ", login='" + login + '\'' +
+                '}';
+    }
 }

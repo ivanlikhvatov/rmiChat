@@ -34,8 +34,10 @@ public class DialogLastMessage {
 
         if (interlocutor.getGender().equals("male")){
             g = "муж";
-        } else {
+        } else if (interlocutor.getGender().equals("female")){
             g = "жен";
+        } else {
+            g = "";
         }
 
         return "<html>" + "<font size='5' style='bold'>" + interlocutor.getUsername() + "</font>" + "  " + "<font size = '3'>" + g + "</font>" + "<br/>" + lastMessage + "</html>";

@@ -199,7 +199,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
             return;
         }
 
-        //TODO проверить на цензуру сообщения, если не проходит бан или предупреждение
         String messageFromServer =  "[" +user.getName() + "]" + " : " + message + "\n";
         GeneralMessage gm = new GeneralMessage();
         gm.setText(messageFromServer);
@@ -225,7 +224,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
             return;
         }
 
-        //TODO проверить на цензуру сообщения, если не проходит бан или предупреждение
         String messageFromServer =  "[" +sender.getName() + "]" + " : " + message + "\n";
         PrivateMessage pm = new PrivateMessage();
         pm.setAddressee(addressee);
@@ -246,7 +244,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
             return;
         }
 
-        //TODO проверить на цензуру сообщения, если не проходит бан или предупреждение
         String messageFromServer =  "[" +sender.getName() + "]" + " : " + message + "\n";
 
         for (String addresseeLogin : addresseesLoginList) {

@@ -2,7 +2,6 @@ package client;
 
 import interfaces.ChatClient;
 import interfaces.ChatServer;
-
 import java.net.MalformedURLException;
 import java.rmi.ConnectException;
 import java.rmi.Naming;

@@ -383,7 +383,7 @@ public class ClientGUI extends JFrame implements ActionListener{
         logoutButton.addActionListener(this);
         getPersonalDataPanelButton = new JButton("личный кабинет");
         getPersonalDataPanelButton.addActionListener(this);
-        savePersonalDataChangesButton = new JButton("сохранить измениния");
+        savePersonalDataChangesButton = new JButton("сохранить изменения");
         savePersonalDataChangesButton.addActionListener(this);
 
         JPanel chooseTypeMessagePanel = new JPanel(new GridLayout(1, 2, 28, 0));

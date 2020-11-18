@@ -5,21 +5,6 @@ import entity.PrivateMessage;
 import entity.User;
 import interfaces.ChatClient;
 import interfaces.ChatServer;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.SAXException;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.net.MalformedURLException;
 import java.rmi.*;
 import java.rmi.server.UnicastRemoteObject;
@@ -27,38 +12,39 @@ import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
-    private List<User> activeUsers;
-    private List<User> allUsers;
+    private HashMap<String, User> activeUsers;
+    private HashMap<String, User> allUsers;
     private Queue<User> connectingUsers;
     private List<Message> allMessages;
     private Queue<Message> messagesToSend;
-    private List<Thread> newMessageSenders;
-    private List<Thread> oldMessageSenders;
-    private List<Thread> messageUploaders;
-    private List<Thread> userUploaders;
-    private Queue<User> usersToUpload;
-    private Queue<Message> messagesToUpload;
+    private List<Runnable> newMessageSenders;
+    private List<Runnable> oldMessageSenders;
     public static final String UNIC_BINDING_NAME = "server";
     public static final String HOST_NAME = "localhost";
-    private static final int MAX_COUNT_THREADS_FOR_NEW_MESSAGE = 400;
-    private static final int MAX_COUNT_THREADS_FOR_OLD_MESSAGE = 100;
-    private static final int MAX_COUNT_THREADS_FOR_UPLOAD_MESSAGE = 400;
-    private static final int MAX_COUNT_THREADS_FOR_UPLOAD_USER = 100;
+    private static int MAX_COUNT_THREADS_FOR_NEW_MESSAGE;
+    private static int MAX_COUNT_THREADS_FOR_OLD_MESSAGE;
+    private static int COUNT_MESSAGE_FOR_ONE_THREAD;
+    private static int COUNT_CONNECTING_USERS_FOR_ONE_THREAD;
 
     public ChatServerImpl() throws RemoteException {
         super();
-        activeUsers = new ArrayList<>();
-        allUsers = new ArrayList<>();
+        activeUsers = new HashMap<>();
+        allUsers = new HashMap<>();
         allMessages = new ArrayList<>();
         messagesToSend = new ConcurrentLinkedQueue<>();
         connectingUsers = new ConcurrentLinkedQueue<>();
-        usersToUpload = new ConcurrentLinkedQueue<>();
-        messagesToUpload = new ConcurrentLinkedQueue<>();
         newMessageSenders = Collections.synchronizedList(new ArrayList<>());
         oldMessageSenders = Collections.synchronizedList(new ArrayList<>());
-        messageUploaders = Collections.synchronizedList(new ArrayList<>());
-        userUploaders = Collections.synchronizedList(new ArrayList<>());
-        loadDataFromFile();
+        setCountsForThreads();
+    }
+
+    private static void setCountsForThreads(){
+        int availableProcessorCounts = Runtime.getRuntime().availableProcessors();
+        int threadCounts = availableProcessorCounts * 5;
+        MAX_COUNT_THREADS_FOR_OLD_MESSAGE = threadCounts / 3;
+        MAX_COUNT_THREADS_FOR_NEW_MESSAGE = threadCounts - MAX_COUNT_THREADS_FOR_OLD_MESSAGE;
+        COUNT_MESSAGE_FOR_ONE_THREAD = 300;
+        COUNT_CONNECTING_USERS_FOR_ONE_THREAD = 100;
     }
 
     @Override
@@ -75,13 +61,11 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                     details.get("login"),
                     nextClient));
 
-            allUsers.add(user);
-            activeUsers.add(user);
+            allUsers.put(user.getLogin(), user);
+            activeUsers.put(user.getLogin(), user);
             updateUserList();
             connectingUsers.add(user);
             createOldMessageSender();
-            usersToUpload.add(user);
-            createUploaderUser();
         } catch(RemoteException | MalformedURLException | NotBoundException e){
             e.printStackTrace();
         }
@@ -92,7 +76,7 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
             ChatClient nextClient = (ChatClient)Naming.lookup("rmi://" + user.getHostName() + "/" + user.getClientServiceName());
             nextClient.setDataAfterLogin(user.getName(), user.getGender());
             user.setClient(nextClient);
-            activeUsers.add(user);
+            activeUsers.put(user.getLogin(), user);
             updateUserList();
             connectingUsers.add(user);
             createOldMessageSender();
@@ -104,7 +88,7 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
 
     @Override
     public void disconnect(ChatClient chatClient){
-        Iterator<User> iter = activeUsers.iterator();
+        Iterator<User> iter = activeUsers.values().iterator();
 
         while (iter.hasNext()) {
             User user = iter.next();
@@ -131,11 +115,13 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
 
     @Override
     public boolean checkLoggingInUser(String login, char[] password){
-        for (User oldUser: allUsers) {
-            if (oldUser.getLogin().equals(login) && Arrays.equals(oldUser.getPassword(), password)){
-                connectOldUser(oldUser);
-                return true;
-            }
+        User user;
+
+        if ((user = allUsers.get(login)) != null && Arrays.equals(user.getPassword(), password)){
+            user = allUsers.get(login);
+
+            connectOldUser(user);
+            return true;
         }
 
         try{
@@ -152,13 +138,12 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
         String login = details[0];
         String name = details[1];
         String gender = details[2];
+        User user;
 
-        for (User user : activeUsers) {
-            if (user.getLogin().equals(login)){
-                user.setName(name);
-                user.setGender(gender);
-                user.setPassword(pass);
-            }
+        if ((user = activeUsers.get(login)) != null){
+            user.setName(name);
+            user.setGender(gender);
+            user.setPassword(pass);
         }
 
         updateUserList();
@@ -167,7 +152,7 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
     private void updateUserList(){
         List<String[]> users = getUserList();
 
-        for(User user : activeUsers){
+        for(User user : activeUsers.values()){
             try {
                 user.getClient().updateUserList(users);
             }
@@ -180,7 +165,7 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
     private List<String[]> getUserList(){
         List<String[]> users = new ArrayList<>();
 
-        for (User user: activeUsers) {
+        for (User user: activeUsers.values()) {
             String[] userDetails = new String[3];
             userDetails[0] = user.getLogin();
             userDetails[1] = user.getName();
@@ -193,7 +178,7 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
 
     @Override
     public void setGeneralMessage(String message, String login) {
-        User user = findActiveByLogin(login);
+        User user = activeUsers.get(login);
 
         if (user == null){
             return;
@@ -205,20 +190,18 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
         gm.setAuthor(user);
         allMessages.add(gm);
         messagesToSend.add(gm);
-        messagesToUpload.add(gm);
-        createUploaderMessage();
         createNewMessageSender();
     }
 
     @Override
     public void setPrivateMessage(String addresseeLogin, String senderLogin, String message){
-        User addressee = findAllByLogin(addresseeLogin);
+        User addressee = allUsers.get(addresseeLogin);
 
         if (addressee == null){
             return;
         }
 
-        User sender = findActiveByLogin(senderLogin);
+        User sender = activeUsers.get(senderLogin);
 
         if (sender == null){
             return;
@@ -231,14 +214,12 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
         pm.setMessage(messageFromServer);
         allMessages.add(pm);
         messagesToSend.add(pm);
-        messagesToUpload.add(pm);
-        createUploaderMessage();
         createNewMessageSender();
     }
 
     @Override
     public void setPrivateMessage(List<String> addresseesLoginList, String senderLogin, String message){
-        User sender = findActiveByLogin(senderLogin);
+        User sender = activeUsers.get(senderLogin);
 
         if (sender == null){
             return;
@@ -247,7 +228,7 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
         String messageFromServer =  "[" +sender.getName() + "]" + " : " + message + "\n";
 
         for (String addresseeLogin : addresseesLoginList) {
-            User addressee = findActiveByLogin(addresseeLogin);
+            User addressee = activeUsers.get(addresseeLogin);
 
             if (addressee == null){
                 return;
@@ -259,8 +240,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
             pm.setMessage(messageFromServer);
             allMessages.add(pm);
             messagesToSend.add(pm);
-            messagesToUpload.add(pm);
-            createUploaderMessage();
             createNewMessageSender();
         }
     }
@@ -272,9 +251,11 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
             return;
         }
 
-        Thread sender = new Thread(new NewMessageSender());
-        sender.start();
-        newMessageSenders.add(sender);
+        if (messagesToSend.size() >= COUNT_MESSAGE_FOR_ONE_THREAD || currentCountThreads == 0){
+            Runnable sender = new NewMessageSender();
+            newMessageSenders.add(sender);
+            sender.run();
+        }
     }
 
     private void createOldMessageSender(){
@@ -284,463 +265,10 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
             return;
         }
 
-        Thread sender = new Thread(new OldMessageSender());
-        sender.start();
-        oldMessageSenders.add(sender);
-    }
-
-    private void createUploaderUser(){
-        int currentCountThreads = userUploaders.size();
-
-        if (currentCountThreads >= MAX_COUNT_THREADS_FOR_UPLOAD_USER){
-            return;
-        }
-
-        Thread loader = new Thread(new UploaderUserInfoToFile());
-        loader.start();
-        userUploaders.add(loader);
-
-    }
-
-    private void createUploaderMessage(){
-        int currentCountThreads = messageUploaders.size();
-
-        if (currentCountThreads >= MAX_COUNT_THREADS_FOR_UPLOAD_MESSAGE){
-            return;
-        }
-
-        Thread loader = new Thread(new UploaderMessageInfoToFile());
-        loader.start();
-        messageUploaders.add(loader);
-    }
-
-    private User findActiveByLogin(String login){
-        for (User user : activeUsers){
-            if (user.getLogin().equals(login)){
-                return user;
-            }
-        }
-
-        return null;
-    }
-
-    private User findAllByLogin(String login){
-        for (User user : allUsers){
-            if (user.getLogin().equals(login)){
-                return user;
-            }
-        }
-
-        return null;
-    }
-
-    public void loadDataFromFile(){
-        try {
-            DocumentBuilder documentBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
-            Document document = documentBuilder.parse("server/data/AllUsers.xml");
-
-            Node root = document.getDocumentElement();
-            NodeList users = root.getChildNodes();
-            for (int i = 0; i < users.getLength(); i++) {
-                Node userNode = users.item(i);
-                if (userNode.getNodeType() != Node.TEXT_NODE) {
-                    NodeList userProps = userNode.getChildNodes();
-                    User user = new User();
-                    for(int j = 0; j < userProps.getLength(); j++) {
-                        Node userProp = userProps.item(j);
-
-                        if (userProp.getNodeType() != Node.TEXT_NODE) {
-                            if (userProp.getNodeName().equals("Username")){
-                                user.setName(userProp.getChildNodes().item(0).getTextContent());
-                            }
-
-                            if (userProp.getNodeName().equals("Password")){
-                                user.setPassword(userProp.getChildNodes().item(0).getTextContent().toCharArray());
-                            }
-
-                            if (userProp.getNodeName().equals("Gender")){
-                                user.setGender(userProp.getChildNodes().item(0).getTextContent());
-                            }
-
-                            if (userProp.getNodeName().equals("HostName")){
-                                user.setHostName(userProp.getChildNodes().item(0).getTextContent());
-                            }
-
-                            if (userProp.getNodeName().equals("ClientServiceName")){
-                                user.setClientServiceName(userProp.getChildNodes().item(0).getTextContent());
-                            }
-
-                            if (userProp.getNodeName().equals("Login")){
-                                user.setLogin(userProp.getChildNodes().item(0).getTextContent());
-                            }
-                        }
-                    }
-                    allUsers.add(user);
-                }
-            }
-
-        } catch (ParserConfigurationException | SAXException | IOException ex) {
-            ex.printStackTrace();
-        }
-
-
-        try {
-            DocumentBuilder documentBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
-            Document document = documentBuilder.parse("server/data/AllMessages.xml");
-
-            Node root = document.getDocumentElement();
-            NodeList messages = root.getChildNodes();
-            for (int i = 0; i < messages.getLength(); i++) {
-                Node messageNode = messages.item(i);
-
-                if (messageNode.getNodeType() != Node.TEXT_NODE) {
-                    Message message;
-
-                    if (messageNode.getAttributes().item(0).getTextContent().equals("PrivateMessage")){
-                        PrivateMessage pm = new PrivateMessage();
-                        NodeList messageProps = messageNode.getChildNodes();
-
-                        for(int j = 0; j < messageProps.getLength(); j++) {
-                            Node messageProp = messageProps.item(j);
-
-                            if (messageProp.getNodeType() != Node.TEXT_NODE) {
-                                if (messageProp.getNodeName().equals("Text")){
-                                    pm.setMessage(messageProp.getChildNodes().item(0).getTextContent());
-                                }
-
-                                if (messageProp.getNodeName().equals("Author")){
-                                    NodeList authorProps = messageProp.getChildNodes();
-                                    User user = new User();
-
-                                    for (int k = 0; k < authorProps.getLength(); k++){
-                                        Node authorProp = authorProps.item(k);
-
-                                        if (authorProp.getNodeType() != Node.TEXT_NODE) {
-                                            if (authorProp.getNodeName().equals("Username")){
-                                                user.setName(authorProp.getChildNodes().item(0).getTextContent());
-                                            }
-
-                                            if (authorProp.getNodeName().equals("Password")){
-                                                user.setPassword(authorProp.getChildNodes().item(0).getTextContent().toCharArray());
-                                            }
-
-                                            if (authorProp.getNodeName().equals("Gender")){
-                                                user.setGender(authorProp.getChildNodes().item(0).getTextContent());
-                                            }
-
-                                            if (authorProp.getNodeName().equals("HostName")){
-                                                user.setHostName(authorProp.getChildNodes().item(0).getTextContent());
-                                            }
-
-                                            if (authorProp.getNodeName().equals("ClientServiceName")){
-                                                user.setClientServiceName(authorProp.getChildNodes().item(0).getTextContent());
-                                            }
-
-                                            if (authorProp.getNodeName().equals("Login")){
-                                                user.setLogin(authorProp.getChildNodes().item(0).getTextContent());
-                                            }
-                                        }
-                                    }
-
-                                    pm.setAuthor(user);
-                                }
-                                if (messageProp.getNodeName().equals("Addressee")){
-                                    NodeList addresseeProps = messageProp.getChildNodes();
-
-                                    User user = new User();
-
-                                    for (int k = 0; k < addresseeProps.getLength(); k++){
-                                        Node addresseeProp = addresseeProps.item(k);
-
-                                        if (addresseeProp.getNodeType() != Node.TEXT_NODE) {
-                                            if (addresseeProp.getNodeName().equals("Username")){
-                                                user.setName(addresseeProp.getChildNodes().item(0).getTextContent());
-                                            }
-
-                                            if (addresseeProp.getNodeName().equals("Password")){
-                                                user.setPassword(addresseeProp.getChildNodes().item(0).getTextContent().toCharArray());
-                                            }
-
-                                            if (addresseeProp.getNodeName().equals("Gender")){
-                                                user.setGender(addresseeProp.getChildNodes().item(0).getTextContent());
-                                            }
-
-                                            if (addresseeProp.getNodeName().equals("HostName")){
-                                                user.setHostName(addresseeProp.getChildNodes().item(0).getTextContent());
-                                            }
-
-                                            if (addresseeProp.getNodeName().equals("ClientServiceName")){
-                                                user.setClientServiceName(addresseeProp.getChildNodes().item(0).getTextContent());
-                                            }
-
-                                            if (addresseeProp.getNodeName().equals("Login")){
-                                                user.setLogin(addresseeProp.getChildNodes().item(0).getTextContent());
-                                            }
-                                        }
-                                    }
-
-                                    pm.setAddressee(user);
-                                }
-                            }
-                        }
-                        message = pm;
-                    }else if (messageNode.getAttributes().item(0).getTextContent().equals("GeneralMessage")){
-                        GeneralMessage gm = new GeneralMessage();
-                        NodeList messageProps = messageNode.getChildNodes();
-
-                        for(int j = 0; j < messageProps.getLength(); j++) {
-                            Node messageProp = messageProps.item(j);
-
-                            if (messageProp.getNodeType() != Node.TEXT_NODE) {
-                                if (messageProp.getNodeName().equals("Text")){
-                                    gm.setMessage(messageProp.getChildNodes().item(0).getTextContent());
-                                }
-
-                                if (messageProp.getNodeName().equals("Author")){
-                                    NodeList authorProps = messageProp.getChildNodes();
-                                    User user = new User();
-
-                                    for (int k = 0; k < authorProps.getLength(); k++){
-                                        Node authorProp = authorProps.item(k);
-
-                                        if (authorProp.getNodeType() != Node.TEXT_NODE) {
-                                            if (authorProp.getNodeName().equals("Username")){
-                                                user.setName(authorProp.getChildNodes().item(0).getTextContent());
-                                            }
-
-                                            if (authorProp.getNodeName().equals("Password")){
-                                                user.setPassword(authorProp.getChildNodes().item(0).getTextContent().toCharArray());
-                                            }
-
-                                            if (authorProp.getNodeName().equals("Gender")){
-                                                user.setGender(authorProp.getChildNodes().item(0).getTextContent());
-                                            }
-
-                                            if (authorProp.getNodeName().equals("HostName")){
-                                                user.setHostName(authorProp.getChildNodes().item(0).getTextContent());
-                                            }
-
-                                            if (authorProp.getNodeName().equals("ClientServiceName")){
-                                                user.setClientServiceName(authorProp.getChildNodes().item(0).getTextContent());
-                                            }
-
-                                            if (authorProp.getNodeName().equals("Login")){
-                                                user.setLogin(authorProp.getChildNodes().item(0).getTextContent());
-                                            }
-                                        }
-                                    }
-                                    gm.setAuthor(user);
-                                }
-                            }
-                        }
-                        message = gm;
-                    }else{
-                        continue;
-                    }
-                    allMessages.add(message);
-                }
-            }
-
-        } catch (ParserConfigurationException | SAXException | IOException ex) {
-            ex.printStackTrace();
-        }
-    }
-
-    class UploaderUserInfoToFile implements Runnable{
-
-
-        @Override
-        public void run() {
-            User user;
-
-            while (usersToUpload.size() > 0){
-                if ((user = usersToUpload.poll()) != null){
-                    try {
-                        DocumentBuilder documentBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
-                        Document document = documentBuilder.parse("server/data/AllUsers.xml");
-                        Node root = document.getDocumentElement();
-                        Element userTag = document.createElement("User");
-                        Element username = document.createElement("Username");
-                        username.setTextContent(user.getName());
-                        Element password = document.createElement("Password");
-                        String passString = new String(user.getPassword());
-                        password.setTextContent(passString);
-                        Element gender = document.createElement("Gender");
-                        gender.setTextContent(user.getGender());
-                        Element hostName = document.createElement("HostName");
-                        hostName.setTextContent(user.getHostName());
-                        Element clientServiceName = document.createElement("ClientServiceName");
-                        clientServiceName.setTextContent(user.getClientServiceName());
-                        Element login = document.createElement("Login");
-                        login.setTextContent(user.getLogin());
-
-                        userTag.appendChild(username);
-                        userTag.appendChild(password);
-                        userTag.appendChild(gender);
-                        userTag.appendChild(hostName);
-                        userTag.appendChild(clientServiceName);
-                        userTag.appendChild(login);
-
-                        root.appendChild(userTag);
-
-                        try {
-                            Transformer tr = TransformerFactory.newInstance().newTransformer();
-                            DOMSource source = new DOMSource(document);
-                            FileOutputStream fos = new FileOutputStream("server/data/AllUsers.xml");
-                            StreamResult result = new StreamResult(fos);
-                            tr.transform(source, result);
-                        } catch (TransformerException | IOException e) {
-                            e.printStackTrace(System.out);
-                        }
-
-                    } catch (ParserConfigurationException | SAXException | IOException ex) {
-                        ex.printStackTrace(System.out);
-                    }
-                }
-            }
-
-            userUploaders.remove(this);
-        }
-
-
-    }
-
-    class UploaderMessageInfoToFile implements Runnable{
-
-        @Override
-        public void run() {
-            Message message;
-
-            while (messagesToUpload.size() > 0){
-                if ((message = messagesToUpload.poll()) != null){
-
-                    if (message instanceof PrivateMessage){
-                        try {
-                            DocumentBuilder documentBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
-                            Document document = documentBuilder.parse("server/data/AllMessages.xml");
-                            Node root = document.getDocumentElement();
-                            Element messageTag = document.createElement("Message");
-                            messageTag.setAttribute("type", "PrivateMessage");
-
-                            Element text = document.createElement("Text");
-                            text.setTextContent(message.getMessage());
-
-                            Element author = document.createElement("Author");
-                            Element authorName = document.createElement("Username");
-                            authorName.setTextContent(((PrivateMessage) message).getAuthor().getName());
-                            Element authorPassword = document.createElement("Password");
-                            String authorPassString = new String(((PrivateMessage) message).getAuthor().getPassword());
-                            authorPassword.setTextContent(authorPassString);
-                            Element authorGender = document.createElement("Gender");
-                            authorGender.setTextContent(((PrivateMessage) message).getAuthor().getGender());
-                            Element authorHostName = document.createElement("HostName");
-                            authorHostName.setTextContent(((PrivateMessage) message).getAuthor().getHostName());
-                            Element authorClientServiceName = document.createElement("ClientServiceName");
-                            authorClientServiceName.setTextContent(((PrivateMessage) message).getAuthor().getClientServiceName());
-                            Element authorLogin = document.createElement("Login");
-                            authorLogin.setTextContent(((PrivateMessage) message).getAuthor().getLogin());
-                            author.appendChild(authorName);
-                            author.appendChild(authorPassword);
-                            author.appendChild(authorGender);
-                            author.appendChild(authorHostName);
-                            author.appendChild(authorClientServiceName);
-                            author.appendChild(authorLogin);
-
-                            Element addressee = document.createElement("Addressee");
-                            Element addresseeUsername = document.createElement("Username");
-                            addresseeUsername.setTextContent(((PrivateMessage) message).getAddressee().getName());
-                            Element addresseePassword = document.createElement("Password");
-                            String addresseePassString = new String(((PrivateMessage) message).getAddressee().getPassword());
-                            addresseePassword.setTextContent(addresseePassString);
-                            Element addresseeGender = document.createElement("Gender");
-                            addresseeGender.setTextContent(((PrivateMessage) message).getAddressee().getGender());
-                            Element addresseeHostName = document.createElement("HostName");
-                            addresseeHostName.setTextContent(((PrivateMessage) message).getAddressee().getHostName());
-                            Element addresseeClientServiceName = document.createElement("ClientServiceName");
-                            addresseeClientServiceName.setTextContent(((PrivateMessage) message).getAddressee().getClientServiceName());
-                            Element addresseeLogin = document.createElement("Login");
-                            addresseeLogin.setTextContent(((PrivateMessage) message).getAddressee().getLogin());
-                            addressee.appendChild(addresseeUsername);
-                            addressee.appendChild(addresseePassword);
-                            addressee.appendChild(addresseeGender);
-                            addressee.appendChild(addresseeHostName);
-                            addressee.appendChild(addresseeClientServiceName);
-                            addressee.appendChild(addresseeLogin);
-
-                            messageTag.appendChild(text);
-                            messageTag.appendChild(author);
-                            messageTag.appendChild(addressee);
-                            root.appendChild(messageTag);
-
-                            try {
-                                Transformer tr = TransformerFactory.newInstance().newTransformer();
-                                DOMSource source = new DOMSource(document);
-                                FileOutputStream fos = new FileOutputStream("server/data/AllMessages.xml");
-                                StreamResult result = new StreamResult(fos);
-                                tr.transform(source, result);
-                            } catch (TransformerException | IOException e) {
-                                e.printStackTrace(System.out);
-                            }
-                        } catch (ParserConfigurationException | SAXException | IOException ex) {
-                            ex.printStackTrace(System.out);
-                        }
-                    }
-
-                    if (message instanceof GeneralMessage){
-                        try {
-                            DocumentBuilder documentBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
-                            Document document = documentBuilder.parse("server/data/AllMessages.xml");
-                            Node root = document.getDocumentElement();
-                            Element messageTag = document.createElement("Message");
-                            messageTag.setAttribute("type", "GeneralMessage");
-
-                            Element text = document.createElement("Text");
-                            text.setTextContent(message.getMessage());
-
-                            Element author = document.createElement("Author");
-                            Element authorName = document.createElement("Username");
-                            authorName.setTextContent(((GeneralMessage) message).getAuthor().getName());
-                            Element authorPassword = document.createElement("Password");
-                            String authorPassString = new String(((GeneralMessage) message).getAuthor().getPassword());
-                            authorPassword.setTextContent(authorPassString);
-                            Element authorGender = document.createElement("Gender");
-                            authorGender.setTextContent(((GeneralMessage) message).getAuthor().getGender());
-                            Element authorHostName = document.createElement("HostName");
-                            authorHostName.setTextContent(((GeneralMessage) message).getAuthor().getHostName());
-                            Element authorClientServiceName = document.createElement("ClientServiceName");
-                            authorClientServiceName.setTextContent(((GeneralMessage) message).getAuthor().getClientServiceName());
-                            Element authorLogin = document.createElement("Login");
-                            authorLogin.setTextContent(((GeneralMessage) message).getAuthor().getLogin());
-                            author.appendChild(authorName);
-                            author.appendChild(authorPassword);
-                            author.appendChild(authorGender);
-                            author.appendChild(authorHostName);
-                            author.appendChild(authorClientServiceName);
-                            author.appendChild(authorLogin);
-
-                            messageTag.appendChild(text);
-                            messageTag.appendChild(author);
-                            root.appendChild(messageTag);
-
-                            try {
-                                Transformer tr = TransformerFactory.newInstance().newTransformer();
-                                DOMSource source = new DOMSource(document);
-                                FileOutputStream fos = new FileOutputStream("server/data/AllMessages.xml");
-                                StreamResult result = new StreamResult(fos);
-                                tr.transform(source, result);
-                            } catch (TransformerException | IOException e) {
-                                e.printStackTrace(System.out);
-                            }
-                        } catch (ParserConfigurationException | SAXException | IOException ex) {
-                            ex.printStackTrace(System.out);
-                        }
-                    }
-
-
-                }
-            }
-
-            messageUploaders.remove(this);
+        if (connectingUsers.size() >= COUNT_CONNECTING_USERS_FOR_ONE_THREAD || currentCountThreads == 0){
+            Runnable sender = new OldMessageSender();
+            oldMessageSenders.add(sender);
+            sender.run();
         }
     }
 
@@ -757,11 +285,11 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                         ChatClient addresseeClient = null;
                         ChatClient authorClient = null;
 
-                        if (activeUsers.contains(pm.getAddressee())){
+                        if (activeUsers.containsKey(pm.getAddressee().getLogin())){
                             addresseeClient = pm.getAddressee().getClient();
                         }
 
-                        if (activeUsers.contains(pm.getAuthor())){
+                        if (activeUsers.containsKey(pm.getAuthor().getLogin())){
                             authorClient = pm.getAuthor().getClient();
                         }
 
@@ -854,7 +382,7 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
 
 
         private void sendToAll(String message){
-            for(User user : activeUsers){
+            for(User user : activeUsers.values()){
                 try {
                     user.getClient().generalMessageFromServer(message);
                 }
@@ -863,6 +391,8 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                 }
             }
         }
+
+
     }
 
     class OldMessageSender implements Runnable{
@@ -873,6 +403,10 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
             while (connectingUsers.size() > 0) {
                 if (allMessages.size() == 0){
                     connectingUsers.poll();
+
+                    if (!oldMessageSenders.isEmpty()){
+                        oldMessageSenders.remove(this);
+                    }
                     return;
                 }
 

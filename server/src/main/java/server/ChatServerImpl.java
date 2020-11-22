@@ -10,41 +10,24 @@ import java.rmi.*;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
     private HashMap<String, User> activeUsers;
-    private HashMap<String, User> allUsers;
-    private Queue<User> connectingUsers;
     private List<Message> allMessages;
     private Queue<Message> messagesToSend;
-    private List<Runnable> newMessageSenders;
-    private List<Runnable> oldMessageSenders;
+    private ExecutorService service;
     public static final String UNIC_BINDING_NAME = "server";
     public static final String HOST_NAME = "localhost";
-    private static int MAX_COUNT_THREADS_FOR_NEW_MESSAGE;
-    private static int MAX_COUNT_THREADS_FOR_OLD_MESSAGE;
-    private static int COUNT_MESSAGE_FOR_ONE_THREAD;
-    private static int COUNT_CONNECTING_USERS_FOR_ONE_THREAD;
+
 
     public ChatServerImpl() throws RemoteException {
         super();
         activeUsers = new HashMap<>();
-        allUsers = new HashMap<>();
         allMessages = new ArrayList<>();
         messagesToSend = new ConcurrentLinkedQueue<>();
-        connectingUsers = new ConcurrentLinkedQueue<>();
-        newMessageSenders = Collections.synchronizedList(new ArrayList<>());
-        oldMessageSenders = Collections.synchronizedList(new ArrayList<>());
-        setCountsForThreads();
-    }
-
-    private static void setCountsForThreads(){
-        int availableProcessorCounts = Runtime.getRuntime().availableProcessors();
-        int threadCounts = availableProcessorCounts * 5;
-        MAX_COUNT_THREADS_FOR_OLD_MESSAGE = threadCounts / 3;
-        MAX_COUNT_THREADS_FOR_NEW_MESSAGE = threadCounts - MAX_COUNT_THREADS_FOR_OLD_MESSAGE;
-        COUNT_MESSAGE_FOR_ONE_THREAD = 300;
-        COUNT_CONNECTING_USERS_FOR_ONE_THREAD = 100;
+        service = Executors.newCachedThreadPool();
     }
 
     @Override
@@ -61,29 +44,11 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                     details.get("login"),
                     nextClient));
 
-            allUsers.put(user.getLogin(), user);
             activeUsers.put(user.getLogin(), user);
             updateUserList();
-            connectingUsers.add(user);
-            createOldMessageSender();
         } catch(RemoteException | MalformedURLException | NotBoundException e){
             e.printStackTrace();
         }
-    }
-
-    public void connectOldUser(User user){
-        try{
-            ChatClient nextClient = (ChatClient)Naming.lookup("rmi://" + user.getHostName() + "/" + user.getClientServiceName());
-            nextClient.setDataAfterLogin(user.getName(), user.getGender());
-            user.setClient(nextClient);
-            activeUsers.put(user.getLogin(), user);
-            updateUserList();
-            connectingUsers.add(user);
-            createOldMessageSender();
-        } catch(RemoteException | MalformedURLException | NotBoundException e){
-            e.printStackTrace();
-        }
-
     }
 
     @Override
@@ -111,26 +76,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
         if(!activeUsers.isEmpty()){
             updateUserList();
         }
-    }
-
-    @Override
-    public boolean checkLoggingInUser(String login, char[] password){
-        User user;
-
-        if ((user = allUsers.get(login)) != null && Arrays.equals(user.getPassword(), password)){
-            user = allUsers.get(login);
-
-            connectOldUser(user);
-            return true;
-        }
-
-        try{
-            Naming.unbind("rmi://" + HOST_NAME + "/" + "Client_" + login);
-        } catch (NotBoundException | MalformedURLException | RemoteException e){
-            e.printStackTrace();
-        }
-
-        return false;
     }
 
     @Override
@@ -195,7 +140,7 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
 
     @Override
     public void setPrivateMessage(String addresseeLogin, String senderLogin, String message){
-        User addressee = allUsers.get(addresseeLogin);
+        User addressee = activeUsers.get(addresseeLogin);
 
         if (addressee == null){
             return;
@@ -245,31 +190,7 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
     }
 
     private void createNewMessageSender(){
-        int currentCountThreads = newMessageSenders.size();
-
-        if (currentCountThreads >= MAX_COUNT_THREADS_FOR_NEW_MESSAGE){
-            return;
-        }
-
-        if (messagesToSend.size() >= COUNT_MESSAGE_FOR_ONE_THREAD || currentCountThreads == 0){
-            Runnable sender = new NewMessageSender();
-            newMessageSenders.add(sender);
-            sender.run();
-        }
-    }
-
-    private void createOldMessageSender(){
-        int currentCountThreads = oldMessageSenders.size();
-
-        if (currentCountThreads >= MAX_COUNT_THREADS_FOR_OLD_MESSAGE){
-            return;
-        }
-
-        if (connectingUsers.size() >= COUNT_CONNECTING_USERS_FOR_ONE_THREAD || currentCountThreads == 0){
-            Runnable sender = new OldMessageSender();
-            oldMessageSenders.add(sender);
-            sender.run();
-        }
+        service.submit(new NewMessageSender());
     }
 
     class NewMessageSender implements Runnable{
@@ -320,10 +241,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                         sendToAll(gm.getText());
                     }
                 }
-            }
-
-            if (!newMessageSenders.isEmpty()){
-                newMessageSenders.remove(this);
             }
         }
 
@@ -393,119 +310,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
         }
 
 
-    }
-
-    class OldMessageSender implements Runnable{
-        @Override
-        public void run() {
-            User user;
-
-            while (connectingUsers.size() > 0) {
-                if (allMessages.size() == 0){
-                    connectingUsers.poll();
-
-                    if (!oldMessageSenders.isEmpty()){
-                        oldMessageSenders.remove(this);
-                    }
-                    return;
-                }
-
-                if ((user = connectingUsers.poll()) != null){
-                    setAllMessages(user);
-                }
-            }
-
-            if (!oldMessageSenders.isEmpty()){
-                oldMessageSenders.remove(this);
-            }
-        }
-
-        private void setAllMessages(User user){
-            List<String[]> privateMessages = new ArrayList<>();
-
-            for (Message message : allMessages) {
-                if (message instanceof GeneralMessage){
-                    try {
-                        user.getClient().generalMessageFromServer(message.getMessage());
-                    } catch (RemoteException e) {
-                        e.printStackTrace();
-                    }
-                }
-
-                if (message instanceof PrivateMessage){
-                    if (((PrivateMessage) message).getAddressee().getLogin().equals(user.getLogin()) || ((PrivateMessage) message).getAuthor().getLogin().equals(user.getLogin())){
-                        String[] messageDetails = new String[7];
-                        messageDetails[0] = ((PrivateMessage) message).getAuthor().getName();
-                        messageDetails[1] = ((PrivateMessage) message).getAuthor().getLogin();
-                        messageDetails[2] = ((PrivateMessage) message).getAuthor().getGender();
-                        messageDetails[3] = ((PrivateMessage) message).getAddressee().getName();
-                        messageDetails[4] = ((PrivateMessage) message).getAddressee().getLogin();
-                        messageDetails[5] = ((PrivateMessage) message).getAddressee().getGender();
-                        messageDetails[6] = message.getMessage();
-
-                        privateMessages.add(messageDetails);
-                    }
-                }
-            }
-
-            try{
-                user.getClient().privateMessageFromServer(privateMessages, findPrivateMessageByUserLogin(user.getLogin()));
-            } catch (RemoteException e) {
-                e.printStackTrace();
-            }
-        }
-
-        private List<String[]> findPrivateMessageByUserLogin(String userLogin){
-            List<String[]> userPrivateMessages = new ArrayList<>();
-            List<String> passedUsers = new ArrayList<>();
-
-            for (int i = allMessages.size() - 1; i >= 0; i--) {
-                if (allMessages.get(i).getClass().equals(PrivateMessage.class)){
-                    PrivateMessage pm = (PrivateMessage) allMessages.get(i);
-
-                    if (pm.getAddressee().getLogin().equals(userLogin)){
-                        if (passedUsers.contains(pm.getAuthor().getLogin())){
-                            continue;
-                        }
-
-                        String login = pm.getAuthor().getLogin();
-                        String username = pm.getAuthor().getName();
-                        String gender = pm.getAuthor().getGender();
-                        String textMessage = pm.getMessage();
-
-                        String[] details = new String[4];
-                        details[0] = login;
-                        details[1] = username;
-                        details[2] = gender;
-                        details[3] = textMessage;
-
-                        passedUsers.add(login);
-                        userPrivateMessages.add(details);
-                    }
-
-                    if (pm.getAuthor().getLogin().equals(userLogin)){
-                        if (passedUsers.contains(pm.getAddressee().getLogin())){
-                            continue;
-                        }
-
-                        String login = pm.getAddressee().getLogin();
-                        String username = pm.getAddressee().getName();
-                        String gender = pm.getAddressee().getGender();
-                        String textMessage = pm.getMessage();
-
-                        String[] details = new String[4];
-                        details[0] = login;
-                        details[1] = username;
-                        details[2] = gender;
-                        details[3] = textMessage;
-
-                        passedUsers.add(login);
-                        userPrivateMessages.add(details);
-                    }
-                }
-            }
-            return userPrivateMessages;
-        }
     }
 
     public static void main (String[] args) throws RemoteException, MalformedURLException {

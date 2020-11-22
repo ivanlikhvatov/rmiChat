@@ -34,13 +34,6 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         clientGUI.setLogin(this.login);
     }
 
-    public ChatClientImpl(ClientGUI clientGUI, String login, char[] password) throws RemoteException {
-        super();
-        this.clientGUI = clientGUI;
-        this.password = password;
-        this.login = login;
-    }
-
     @Override
     public void identificationUser(){
         clientServiceName = "Client_" + login;
@@ -72,56 +65,6 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
         clientGUI.assignPrivateMessages();
         clientGUI.assignPrivateDialogs();
         registerWithServer(details, password);
-    }
-
-    @Override
-    public void setDataAfterLogin(String name, String gender){
-        this.username = name;
-        this.gender = gender;
-
-        clientGUI.setDataAfterLogin(name, gender);
-    }
-
-    @Override
-    public boolean checkLoggingInUser(String login, char[] password){
-        try {
-            clientServiceName = "Client_" + login;
-            List<String> users = Arrays.asList(Naming.list(UNIC_BINDING_NAME));
-
-            if (users.contains("//:1099/" + clientServiceName)){
-                clientGUI.generateErrorMessage("Ваш клиент уже запущен", "Проблемы с подключением");
-                return false;
-            }
-
-            Naming.rebind("rmi://" + HOST_NAME + "/" + clientServiceName, this);
-            chatServer = (ChatServer) Naming.lookup(UNIC_BINDING_NAME);
-
-            if (!chatServer.checkLoggingInUser(login, password)){
-                clientGUI.generateErrorMessage("Пользователя с таким паролем\nи/или логином не существует", "Проблемы с подключением");
-                return false;
-            }
-
-            return true;
-
-        }
-        catch (ConnectException ce) {
-            clientGUI.generateErrorMessage("Проблемы на сервере\nПопробуйте позже", "Проблемы с подключением");
-            ce.printStackTrace();
-        }
-        catch(NotBoundException nb){
-            clientGUI.generateErrorMessage("Сервер с таким названием\n не существует", "Проблемы с подключением");
-            nb.printStackTrace();
-        }
-        catch (MalformedURLException me){
-            clientGUI.generateErrorMessage("URL-порт не действителен", "Проблемы с подключением");
-            me.printStackTrace();
-        }
-        catch (RemoteException re){
-            clientGUI.generateErrorMessage("Неккоретный пользователь", "Проблемы с подключением");
-            re.printStackTrace();
-        }
-
-        return false;
     }
 
     public void registerWithServer(Map<String, String> details, char[] password) {
@@ -158,11 +101,6 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
     @Override
     public void privateMessageFromServer(Map<String, String> messageDetails, List<String[]> interlocutorsAndLastMessage){
         clientGUI.updatePrivateMessages(messageDetails, interlocutorsAndLastMessage);
-    }
-
-    @Override
-    public void privateMessageFromServer(List<String[]> messages, List<String[]> interlocutorsAndLastMessage){
-        clientGUI.updatePrivateMessages(messages, interlocutorsAndLastMessage);
     }
 
     @Override

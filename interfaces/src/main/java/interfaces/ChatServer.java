@@ -11,8 +11,6 @@ public interface ChatServer extends Remote {
 
     void changePersonalData(String[] details, char[] pass) throws RemoteException;
 
-    boolean checkLoggingInUser(String login, char[] password) throws RemoteException;
-
     void setPrivateMessage(String addressee, String sender, String message) throws RemoteException;
 
     void setPrivateMessage(List<String> addressees, String sender, String message) throws RemoteException;

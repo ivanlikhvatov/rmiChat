@@ -29,10 +29,10 @@ public class ClientGUI extends JFrame implements ActionListener{
     private JList<User> activeUsers;
     private JList<DialogLastMessage> privateDialogs;
     private JPanel inputPanel;
-    private JTextField nameInput, messageInput, loginInput;
+    private JTextField nameInput, messageInput;
     private JPasswordField passInput;
     private JRadioButton radioMale, radioFemale;
-    private JButton getLoginPanelButton, loginButton, logoutButton, getRegistrationPanelButton,
+    private JButton logoutButton, getRegistrationPanelButton,
             registrationButton, sendGMButton, sendPMessageButton, getStartPanelButton, getGMPanelButton,
             getDialogsPanelButton, openPrivateChatButton, getPersonalDataPanelButton, savePersonalDataChangesButton;
     private JPanel activeUsersScrollPanel;
@@ -137,39 +137,6 @@ public class ClientGUI extends JFrame implements ActionListener{
             chatClient.changePersonalData(name, gender, pass);
         }
 
-        if (e.getSource() == loginButton){
-            if (loginInput.getText().isEmpty() || passInput.getPassword().length == 0 ){
-                generateErrorMessage("Заполните все поля!", "Не все поля заполнены");
-                return;
-            }
-
-            pass = passInput.getPassword();
-            login = loginInput.getText();
-
-            try{
-                chatClient = new ChatClientImpl(this, login, pass);
-
-                if (chatClient.checkLoggingInUser(loginInput.getText(), pass)){
-                    container.removeAll();
-                    container.setLayout(new BorderLayout());
-                    container.add(getGeneralMessagePanel(), BorderLayout.CENTER);
-                    container.revalidate();
-                    this.setBounds(300,200,750,400);
-                }
-            } catch (RemoteException remoteException){
-                generateErrorMessage("Невозможно подключиться к серверу", "Ошибка входа");
-                remoteException.printStackTrace();
-            }
-        }
-
-        if (e.getSource() == getLoginPanelButton){
-            container.removeAll();
-            container.setLayout(new BorderLayout());
-            container.add(getLoginPanel(), BorderLayout.CENTER);
-            container.revalidate();
-        }
-
-
         if (e.getSource() == logoutButton){
             if(chatClient != null){
                 chatClient.disconnect(chatClient);
@@ -234,57 +201,14 @@ public class ClientGUI extends JFrame implements ActionListener{
     public JPanel getStartPanel(){
         JPanel gridPanel = new JPanel(new GridLayout(1, 2, 5, 0));
 
-        JLabel label = new JLabel("Войдите или зарегистрируйтесь");
-        getLoginPanelButton = new JButton("Войти ");
-        getLoginPanelButton.addActionListener(this);
         getRegistrationPanelButton = new JButton("Зарегистрироваться ");
         getRegistrationPanelButton.addActionListener(this);
-        gridPanel.add(getLoginPanelButton);
         gridPanel.add(getRegistrationPanelButton);
 
         JPanel startPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 70));
-        startPanel.add(label);
         startPanel.add(gridPanel);
 
         return startPanel;
-    }
-
-    public JPanel getLoginPanel(){
-        JPanel loginPanel = new JPanel(new BorderLayout());
-        SpringLayout layout = new SpringLayout();
-        loginPanel.setLayout(layout);
-
-        JLabel loginLabel = new JLabel("Логин: ");
-        loginInput = new JTextField("", 20);
-        JLabel passLabel = new JLabel("Пароль: ");
-        passInput = new JPasswordField("", 20);
-        loginButton = new JButton("войти");
-        loginButton.addActionListener(this);
-        getStartPanelButton = new JButton("вернуться в главное меню");
-        getStartPanelButton.addActionListener(this);
-
-        layout.putConstraint(SpringLayout.WEST , loginLabel, 10, SpringLayout.WEST , loginPanel);
-        layout.putConstraint(SpringLayout.NORTH, loginLabel, 28, SpringLayout.NORTH, loginPanel);
-        layout.putConstraint(SpringLayout.NORTH, loginInput, 25, SpringLayout.NORTH, loginPanel);
-        layout.putConstraint(SpringLayout.WEST , loginInput, 49, SpringLayout.EAST , loginLabel);
-
-        layout.putConstraint(SpringLayout.WEST , passLabel, 10, SpringLayout.WEST , loginPanel);
-        layout.putConstraint(SpringLayout.NORTH, passLabel, 56, SpringLayout.NORTH, loginPanel);
-        layout.putConstraint(SpringLayout.NORTH, passInput, 50, SpringLayout.NORTH, loginPanel);
-        layout.putConstraint(SpringLayout.WEST , passInput, 40, SpringLayout.EAST , passLabel);
-
-        layout.putConstraint(SpringLayout.NORTH, loginButton, 100, SpringLayout.NORTH, loginPanel);
-        layout.putConstraint(SpringLayout.NORTH, getStartPanelButton, 100, SpringLayout.NORTH, loginPanel);
-        layout.putConstraint(SpringLayout.WEST , getStartPanelButton, 5, SpringLayout.EAST , loginButton);
-
-        loginPanel.add(loginLabel);
-        loginPanel.add(loginInput);
-        loginPanel.add(passLabel);
-        loginPanel.add(passInput);
-        loginPanel.add(loginButton);
-        loginPanel.add(getStartPanelButton);
-
-        return loginPanel;
     }
 
     public JPanel getRegistrationPanel(){
@@ -789,31 +713,6 @@ public class ClientGUI extends JFrame implements ActionListener{
             privateTextArea.append(messageDetails.get("message"));
             privateTextArea.setCaretPosition(privateTextArea.getDocument().getLength());
         }
-    }
-
-    public void updatePrivateMessages(List<String[]> messages, List<String[]> interlocutorsAndLastMessage){
-        for (String[] messageDetails: messages) {
-            PrivateMessage pm = new PrivateMessage();
-            pm.setSender(new User(messageDetails[1], messageDetails[0], messageDetails[2]));
-            pm.setAddressee(new User(messageDetails[4], messageDetails[3], messageDetails[5]));
-            pm.setText(messageDetails[6]);
-            privateMessages.add(pm);
-
-            if (privateTextArea != null){
-                privateTextArea.append(messageDetails[4]);
-                privateTextArea.setCaretPosition(privateTextArea.getDocument().getLength());
-            }
-        }
-
-        setPrivateDialogsPanel(interlocutorsAndLastMessage);
-    }
-
-    public void setDataAfterLogin(String name, String gender) {
-        this.name = name;
-        this.gender = gender;
-        generalMessages = new ArrayList<>();
-        privateMessages = new ArrayList<>();
-        privateDialogs = new JList<>();
     }
 
     public void generateErrorMessage(String text, String title) {

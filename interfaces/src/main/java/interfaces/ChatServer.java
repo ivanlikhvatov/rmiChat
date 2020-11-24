@@ -7,7 +7,7 @@ import java.util.Map;
 public interface ChatServer extends Remote {
     void connectNewUser(Map<String, String> details, char[] password) throws RemoteException;
 
-    void disconnect(ChatClient chatClient) throws RemoteException;
+    void disconnect(String login) throws RemoteException;
 
     void changePersonalData(String[] details, char[] pass) throws RemoteException;
 

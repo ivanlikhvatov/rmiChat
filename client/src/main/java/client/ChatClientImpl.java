@@ -17,7 +17,6 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
     private String gender;
     private char[] password;
     private String login;
-    private String clientServiceName;
     private ChatServer chatServer;
 
     private static final String HOST_NAME = "localhost";
@@ -36,7 +35,7 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
 
     @Override
     public void identificationUser(){
-        clientServiceName = "Client_" + login;
+        String clientServiceName = "Client_" + login;
         Map<String, String> details = new HashMap<>();
         details.put("username", username);
         details.put("gender", gender);
@@ -104,11 +103,6 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
     }
 
     @Override
-    public String getClientServiceName() {
-        return clientServiceName;
-    }
-
-    @Override
     public void sendPrivateMessage(String addressee, String message){
         try{
             chatServer.setPrivateMessage(addressee, login, message);
@@ -161,9 +155,9 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
 
     }
 
-    public void disconnect(ChatClientImpl chatClient) {
+    public void disconnect() {
         try{
-            chatServer.disconnect(chatClient);
+            chatServer.disconnect(login);
         } catch (RemoteException e) {
             clientGUI.generateErrorMessage("Проблемы с отключением от сервера", "Ошибка закрытия приложения");
             e.printStackTrace();

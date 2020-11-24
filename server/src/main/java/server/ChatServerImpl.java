@@ -9,22 +9,22 @@ import java.net.MalformedURLException;
 import java.rmi.*;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
-    private HashMap<String, User> activeUsers;
+    private Map<String, User> activeUsers;
     private List<Message> allMessages;
     private Queue<Message> messagesToSend;
     private ExecutorService service;
     public static final String UNIC_BINDING_NAME = "server";
     public static final String HOST_NAME = "localhost";
 
-
     public ChatServerImpl() throws RemoteException {
         super();
-        activeUsers = new HashMap<>();
+        activeUsers = new ConcurrentHashMap<>();
         allMessages = new ArrayList<>();
         messagesToSend = new ConcurrentLinkedQueue<>();
         service = Executors.newCachedThreadPool();
@@ -44,7 +44,7 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                     details.get("login"),
                     nextClient));
 
-            activeUsers.put(user.getLogin(), user);
+            activeUsers.putIfAbsent(user.getLogin(), user);
             updateUserList();
         } catch(RemoteException | MalformedURLException | NotBoundException e){
             e.printStackTrace();
@@ -52,23 +52,12 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
     }
 
     @Override
-    public void disconnect(ChatClient chatClient){
-        Iterator<User> iter = activeUsers.values().iterator();
-
-        while (iter.hasNext()) {
-            User user = iter.next();
-
-            try{
-                if (user.getClientServiceName().equals(chatClient.getClientServiceName())){
-                    iter.remove();
-                }
-            } catch (RemoteException e){
-                e.printStackTrace();
-            }
-        }
+    public void disconnect(String login){
+        String clientServiceName = activeUsers.get(login).getClientServiceName();
+        activeUsers.remove(login);
 
         try{
-            Naming.unbind("rmi://" + HOST_NAME + "/" + chatClient.getClientServiceName());
+            Naming.unbind("rmi://" + HOST_NAME + "/" + clientServiceName);
         } catch (NotBoundException | MalformedURLException | RemoteException e){
             e.printStackTrace();
         }

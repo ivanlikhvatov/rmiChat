@@ -7,8 +7,6 @@ import java.util.Map;
 public interface ChatClient extends Remote {
     void identificationUser() throws RemoteException;
 
-    String getClientServiceName() throws RemoteException;
-
     void updateUserList(List<String[]> activeUsers) throws RemoteException;
 
     void sendPrivateMessage(String addressee, String message) throws RemoteException;

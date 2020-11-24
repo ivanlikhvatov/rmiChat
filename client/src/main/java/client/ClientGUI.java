@@ -51,7 +51,7 @@ public class ClientGUI extends JFrame implements ActionListener{
             @Override
             public void windowClosing(WindowEvent windowEvent) {
                 if(chatClient != null){
-                    chatClient.disconnect(chatClient);
+                    chatClient.disconnect();
                 }
 
                 System.exit(0);
@@ -139,7 +139,7 @@ public class ClientGUI extends JFrame implements ActionListener{
 
         if (e.getSource() == logoutButton){
             if(chatClient != null){
-                chatClient.disconnect(chatClient);
+                chatClient.disconnect();
                 login = null;
                 pass = null;
                 chatClient = null;

@@ -16,7 +16,6 @@ import java.util.concurrent.Executors;
 
 public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
     private Map<String, User> activeUsers;
-    private List<Message> allMessages;
     private Queue<Message> messagesToSend;
     private ExecutorService service;
     public static final String UNIC_BINDING_NAME = "server";
@@ -25,7 +24,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
     public ChatServerImpl() throws RemoteException {
         super();
         activeUsers = new ConcurrentHashMap<>();
-        allMessages = new ArrayList<>();
         messagesToSend = new ConcurrentLinkedQueue<>();
         service = Executors.newCachedThreadPool();
     }
@@ -122,7 +120,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
         GeneralMessage gm = new GeneralMessage();
         gm.setText(messageFromServer);
         gm.setAuthor(user);
-        allMessages.add(gm);
         messagesToSend.add(gm);
         createNewMessageSender();
     }
@@ -146,7 +143,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
         pm.setAddressee(addressee);
         pm.setAuthor(sender);
         pm.setMessage(messageFromServer);
-        allMessages.add(pm);
         messagesToSend.add(pm);
         createNewMessageSender();
     }
@@ -172,7 +168,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
             pm.setAuthor(sender);
             pm.setAddressee(addressee);
             pm.setMessage(messageFromServer);
-            allMessages.add(pm);
             messagesToSend.add(pm);
             createNewMessageSender();
         }
@@ -214,11 +209,23 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
 
                         try{
                             if (authorClient != null){
-                                authorClient.privateMessageFromServer(messageDetails, findPrivateMessageByUserLogin(pm.getAuthor().getLogin()));
+                                String[] lastMessage = new String[4];
+                                lastMessage[0] = pm.getAddressee().getLogin();
+                                lastMessage[1] = pm.getAddressee().getName();
+                                lastMessage[2] = pm.getAuthor().getGender();
+                                lastMessage[3] = pm.getMessage();
+
+                                authorClient.privateMessageFromServer(messageDetails, lastMessage);
                             }
 
                             if (addresseeClient != null){
-                                addresseeClient.privateMessageFromServer(messageDetails, findPrivateMessageByUserLogin(pm.getAddressee().getLogin()));
+                                String[] lastMessage = new String[4];
+                                lastMessage[0] = pm.getAuthor().getLogin();
+                                lastMessage[1] = pm.getAuthor().getName();
+                                lastMessage[2] = pm.getAuthor().getGender();
+                                lastMessage[3] = pm.getMessage();
+
+                                addresseeClient.privateMessageFromServer(messageDetails, lastMessage);
                             }
                         } catch (RemoteException e) {
                             e.printStackTrace();
@@ -233,60 +240,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
             }
         }
 
-        private List<String[]> findPrivateMessageByUserLogin(String userLogin){
-            List<String[]> userPrivateMessages = new ArrayList<>();
-            List<String> passedUsers = new ArrayList<>();
-
-            for (int i = allMessages.size() - 1; i >= 0; i--) {
-                if (allMessages.get(i) instanceof PrivateMessage){
-                    PrivateMessage pm = (PrivateMessage) allMessages.get(i);
-
-                    if (pm.getAddressee().getLogin().equals(userLogin)){
-                        if (passedUsers.contains(pm.getAuthor().getLogin())){
-                            continue;
-                        }
-
-                        String login = pm.getAuthor().getLogin();
-                        String username = pm.getAuthor().getName();
-                        String gender = pm.getAuthor().getGender();
-                        String textMessage = pm.getMessage();
-
-                        String[] details = new String[4];
-                        details[0] = login;
-                        details[1] = username;
-                        details[2] = gender;
-                        details[3] = textMessage;
-
-                        passedUsers.add(login);
-                        userPrivateMessages.add(details);
-                    }
-
-                    if (pm.getAuthor().getLogin().equals(userLogin)){
-                        if (passedUsers.contains(pm.getAddressee().getLogin())){
-                            continue;
-                        }
-
-                        String login = pm.getAddressee().getLogin();
-                        String username = pm.getAddressee().getName();
-                        String gender = pm.getAddressee().getGender();
-                        String textMessage = pm.getMessage();
-
-
-                        String[] details = new String[4];
-                        details[0] = login;
-                        details[1] = username;
-                        details[2] = gender;
-                        details[3] = textMessage;
-
-                        passedUsers.add(login);
-                        userPrivateMessages.add(details);
-                    }
-                }
-            }
-            return userPrivateMessages;
-        }
-
-
         private void sendToAll(String message){
             for(User user : activeUsers.values()){
                 try {
@@ -297,8 +250,6 @@ public class ChatServerImpl extends UnicastRemoteObject implements ChatServer {
                 }
             }
         }
-
-
     }
 
     public static void main (String[] args) throws RemoteException, MalformedURLException {

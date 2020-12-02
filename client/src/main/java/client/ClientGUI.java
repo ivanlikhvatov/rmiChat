@@ -10,10 +10,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowEvent;
 import java.rmi.RemoteException;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 
 public class ClientGUI extends JFrame implements ActionListener{
     private ChatClientImpl chatClient;
@@ -444,9 +442,7 @@ public class ClientGUI extends JFrame implements ActionListener{
         flowLeftAndRight.add(flowRight);
 
         if (privateDialogs.getModel().getSize() == 0){
-            List<String[]> emptyDialogs = new ArrayList<>();
-            emptyDialogs.add(new String[]{"nothing", "У вас нет сообщений", "", ""});
-            setPrivateDialogsPanel(emptyDialogs);
+            setPrivateDialogsPanel(new String[]{"nothing", "У вас нет сообщений", "", ""});
         }
 
         dialogsPanel.add(flowLeftAndRight, BorderLayout.NORTH);
@@ -548,20 +544,33 @@ public class ClientGUI extends JFrame implements ActionListener{
         return inputPanel;
     }
 
-    public void setPrivateDialogsPanel(List<String[]> interlocutorsAndLastMessage){
+    public void setPrivateDialogsPanel(String[] messageDetails){
         pmDialogsScrollPanel = new JPanel(new BorderLayout());
         DefaultListModel<DialogLastMessage> tempPrivateMessages = new DefaultListModel<>();
+        List<DialogLastMessage> dialogLastMessagesList = new ArrayList<>();
 
-        for (String[] messageDetails : interlocutorsAndLastMessage){
-            String login = messageDetails[0];
-            String username = messageDetails[1];
-            String gender = messageDetails[2];
-            String message = messageDetails[3];
+        String login = messageDetails[0];
+        String username = messageDetails[1];
+        String gender = messageDetails[2];
+        String message = messageDetails[3];
+        User user = new User(login, username, gender);
 
-            User user = new User(login, username, gender);
-            tempPrivateMessages.addElement(new DialogLastMessage(user, message));
+        if (privateDialogs != null){
+
+            for (int i = 0; i < privateDialogs.getModel().getSize(); i++){
+                dialogLastMessagesList.add(privateDialogs.getModel().getElementAt(i));
+            }
+
+            dialogLastMessagesList
+                    .removeIf(dialogLastMessage -> dialogLastMessage.getInterlocutor().getLogin().equals(login)
+                                    || dialogLastMessage.getInterlocutor().getLogin().equals("nothing")
+                    );
+
+
         }
 
+        dialogLastMessagesList.add(0, new DialogLastMessage(user, message));
+        tempPrivateMessages.addAll(dialogLastMessagesList);
         privateDialogs = new JList<>(tempPrivateMessages);
         privateDialogs.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         privateDialogs.setVisibleRowCount(2);
@@ -688,7 +697,7 @@ public class ClientGUI extends JFrame implements ActionListener{
         }
     }
 
-    public void updatePrivateMessages(Map<String, String> messageDetails, List<String[]> interlocutorsAndLastMessage) {
+    public void updatePrivateMessages(Map<String, String> messageDetails, String[] interlocutorAndLastMessage) {
         PrivateMessage pm = new PrivateMessage();
         pm.setAddressee(new User(messageDetails.get("addresseeLogin"), messageDetails.get("addresseeName"), messageDetails.get("addresseeGender")));
         pm.setSender(new User(messageDetails.get("authorLogin"), messageDetails.get("authorName"), messageDetails.get("authorGender")));
@@ -698,7 +707,7 @@ public class ClientGUI extends JFrame implements ActionListener{
             dialogsPanel.remove(pmDialogsScrollPanel);
         }
 
-        setPrivateDialogsPanel(interlocutorsAndLastMessage);
+        setPrivateDialogsPanel(interlocutorAndLastMessage);
         pmDialogsScrollPanel.repaint();
         pmDialogsScrollPanel.revalidate();
         privateMessages.add(pm);

@@ -17,5 +17,5 @@ public interface ChatClient extends Remote {
 
     void generalMessageFromServer(String message) throws RemoteException;
 
-    void privateMessageFromServer(Map<String, String> messageDetails, List<String[]> interlocutorsAndLastMessage) throws RemoteException;
+    void privateMessageFromServer(Map<String, String> messageDetails, String[] interlocutorAndLastMessage) throws RemoteException;
 }

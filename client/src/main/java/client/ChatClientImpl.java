@@ -98,8 +98,8 @@ public class ChatClientImpl extends UnicastRemoteObject implements ChatClient {
     }
 
     @Override
-    public void privateMessageFromServer(Map<String, String> messageDetails, List<String[]> interlocutorsAndLastMessage){
-        clientGUI.updatePrivateMessages(messageDetails, interlocutorsAndLastMessage);
+    public void privateMessageFromServer(Map<String, String> messageDetails, String[] interlocutorAndLastMessage){
+        clientGUI.updatePrivateMessages(messageDetails, interlocutorAndLastMessage);
     }
 
     @Override
